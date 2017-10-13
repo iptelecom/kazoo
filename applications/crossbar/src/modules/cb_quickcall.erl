@@ -241,6 +241,7 @@ originate_quickcall(Endpoints, Call, Context) ->
     lager:debug("quickcall default cid ~s : ~s : ~s", [CIDType, DefaultCIDNumber, DefaultCIDName]),
 
     CallTimeoutS = get_timeout(Context),
+    CallId = <<(cb_context:req_id(Context))/binary, "-quickcall">>,
 
     Request =
         kz_json:from_list(
@@ -266,6 +267,8 @@ originate_quickcall(Endpoints, Call, Context) ->
           ,{<<"Outbound-Callee-ID-Number">>, get_cid_number(Context, DefaultCIDNumber)}
           ,{<<"Outbound-Caller-ID-Name">>, <<"Device QuickCall">>}
           ,{<<"Outbound-Caller-ID-Number">>, kapps_call:request_user(Call)}
+          ,{<<"Outbound-Call-ID">>, CallId}
+          ,{<<"Origination-Call-ID">>, CallId}
           ,{<<"Timeout">>, CallTimeoutS}
            | kz_api:default_headers(<<"resource">>, <<"originate_req">>, ?APP_NAME, ?APP_VERSION)
           ]),
