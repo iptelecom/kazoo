@@ -142,6 +142,9 @@ process_action(Module, Function, Args, Acc) ->
     Us ++ Acc.
 
 %% define entry points for modules
+function_args('ecallmgr_call_event_stream') ->
+    [{'to_json', [?VAR(0, 'Props')]}
+    ];
 function_args('ecallmgr_util') ->
     [{'custom_channel_vars', [?VAR(0, 'Props')]}
     ,{'conference_channel_vars', [?VAR(0, 'Props')]}
