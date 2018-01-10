@@ -108,6 +108,8 @@
 -export([order_by/3]).
 
 -include_lib("kazoo_stdlib/include/kz_log.hrl").
+
+%% %% @headerfile "../include/kazoo_json.hrl"
 -include_lib("kazoo_stdlib/include/kazoo_json.hrl").
 
 -export_type([json_proplist/0
@@ -127,7 +129,6 @@ encode(JObj) -> encode(JObj, []).
 
 -spec encode(json_term(), encode_options()) -> kz_term:text().
 encode(JObj, Options) -> jiffy:encode(JObj, Options).
-
 
 -spec unsafe_decode(iolist() | kz_term:ne_binary()) -> json_term().
 unsafe_decode(Thing) when is_list(Thing);
@@ -149,7 +150,6 @@ unsafe_decode(JSON, <<"application/json">>) ->
         _Error:_Reason ->
             throw({'invalid_json', {'error', {0, 'decoder_exit'}}, JSON})
     end.
-
 
 -spec decode(iolist() | kz_term:ne_binary()) -> json_term().
 decode(Thing) when is_list(Thing)
@@ -255,10 +255,10 @@ are_equal(JObj1, JObj2) ->
 %% Converts top-level proplist to json object, but only if sub-proplists have been converted
 %% first.
 %% For example:
-%% [{a, b}, {c, [{d, e}]}]
+%% ```[{a, b}, {c, [{d, e}]}]'''
 %% would be converted to json by
-%% kz_json:from_list([{a,b}, {c, kz_json:from_list([{d, e}])}]).
-%% the sub-proplist [{d,e}] needs converting before being passed to the next level
+%% ```kz_json:from_list([{a,b}, {c, kz_json:from_list([{d, e}])}]).'''
+%% the sub-proplist ```[{d,e}]''' needs converting before being passed to the next level
 %% @end
 %%--------------------------------------------------------------------
 -spec from_list(json_proplist()) -> object().
@@ -306,6 +306,7 @@ merge(JObj1, JObj2) ->
 -type merge_arg_2() :: {'left' | 'right', json_term()} | {'both', json_term(), json_term()}.
 -type merge_fun_result() :: 'undefined' | {'ok', json_term()}.
 -type merge_fun() :: fun((key(), merge_arg_2()) -> merge_fun_result()).
+
 -spec merge(merge_fun(), object(), object()) -> object().
 merge(MergeFun, ?JSON_WRAPPER(PropsA), ?JSON_WRAPPER(PropsB)) ->
     ListA = lists:sort(PropsA),
@@ -429,11 +430,12 @@ merge_recursive(?JSON_WRAPPER(_)=JObj1, Value, Pred, Keys) when is_function(Pred
 %% the value from JObj1 is kept untouched. If it is undefined it's the one from JObj2.
 %% @end
 %%--------------------------------------------------------------------
+-type sumer() :: fun((json_term(), json_term()) -> json_term()).
+
 -spec sum(object(), object()) -> object().
 sum(?JSON_WRAPPER(_)=JObj1, ?JSON_WRAPPER(_)=JObj2) ->
     sum(JObj1, JObj2, fun default_sumer/2).
 
--type sumer() :: fun((json_term(), json_term()) -> json_term()).
 -spec default_sumer(json_term(), json_term()) -> json_term().
 default_sumer(Value1, undefined) -> Value1;
 default_sumer(undefined, Value2) -> Value2;
@@ -604,21 +606,25 @@ filter(Pred, JObj, Key) ->
     filter(Pred, JObj, [Key]).
 
 -type mapper() :: fun((key(), json_term()) -> {key(), json_term()}).
+
 -spec map(mapper(), object() | flat_object()) -> object() | flat_object().
 map(F, ?JSON_WRAPPER(Prop)) when is_function(F, 2) ->
     from_list([F(K, V) || {K,V} <- Prop]).
 
 -type filtermapper() :: fun((key(), json_term()) -> boolean() | {'true', json_term()}).
+
 -spec filtermap(filtermapper(), object() | flat_object()) -> object() | flat_object().
 filtermap(F, ?JSON_WRAPPER(Prop)) when is_function(F, 2) ->
     ?JSON_WRAPPER(lists:filtermap(fun({K, V}) -> F(K, V) end, Prop)).
 
 -type foreach_fun() :: fun(({key(), json_term()}) -> any()).
+
 -spec foreach(foreach_fun(), object()) -> 'ok'.
 foreach(F, ?JSON_WRAPPER(Prop)) when is_function(F, 1) ->
     lists:foreach(F, Prop).
 
 -type kv_boolean_pred() :: fun(({key(), json_term()}) -> boolean()).
+
 -spec all(kv_boolean_pred(), object()) -> boolean().
 all(Pred, ?JSON_WRAPPER(Prop)) when is_function(Pred, 1) ->
     lists:all(Pred, Prop).
@@ -628,6 +634,7 @@ any(Pred, ?JSON_WRAPPER(Prop)) when is_function(Pred, 1) ->
     lists:any(Pred, Prop).
 
 -type folder() :: fun((key(), json_term(), any()) -> any()).
+
 -spec foldl(folder(), any(), object()) -> any().
 foldl(F, Acc0, ?JSON_WRAPPER([])) when is_function(F, 3) -> Acc0;
 foldl(F, Acc0, ?JSON_WRAPPER(Prop)) when is_function(F, 3) ->
@@ -786,9 +793,9 @@ get_binary_boolean(Key, JObj, Default) ->
     end.
 
 -spec get_keys(object() | flat_object()) -> keys() | [keys(),...] | [].
--spec get_keys(path(), object() | flat_object()) -> keys() | [keys(),...] | [].
 get_keys(JObj) -> get_keys1(JObj).
 
+-spec get_keys(path(), object() | flat_object()) -> keys() | [keys(),...] | [].
 get_keys([], JObj) -> get_keys1(JObj);
 get_keys(Keys, JObj) -> get_keys1(get_json_value(Keys, JObj, new())).
 
@@ -896,8 +903,7 @@ get_value([Key|Ks], L, Default) when is_list(L) ->
 get_value(K, Doc, Default) ->
     get_value1(K, Doc, Default).
 
--spec get_value1(path(), kz_term:api_object() | objects(), Default) ->
-                        json_term() | Default.
+-spec get_value1(path(), kz_term:api_object() | objects(), Default) -> json_term() | Default.
 get_value1([], 'undefined', Default) -> Default;
 get_value1([], JObj, _Default) -> JObj;
 get_value1(Key, JObj, Default) when not is_list(Key)->
@@ -1055,9 +1061,9 @@ delete_key(Key, JObj) ->
 %% @doc
 %%  No 'prune' leaves the parent intact (default).
 %%  With 'prune': removes the parent key if the result of the delete is an empty list.
-%%  So, delete_key([<<"k1">>, <<"k1.1">>], {[{<<"k1">>, {[{<<"k1.1">>, <<"v1.1">>}]}}]}) would result in
-%%    'no_prune' -> {[{<<"k1">>, []}]}
-%%    'prune' -> {[]}
+%%  So, `delete_key([<<"k1">>, <<"k1.1">>], {[{<<"k1">>, {[{<<"k1.1">>, <<"v1.1">>}]}}]})' would result in
+%%    ```'no_prune' -> {[{<<"k1">>, []}]}
+%%    'prune' -> {[]}'''
 %% @end
 %%--------------------------------------------------------------------
 
@@ -1175,17 +1181,11 @@ replace_in_list(N, V1, [V | Vs], Acc) ->
 %% Read a json fixture file from the filesystem into memory
 %% @end
 %%--------------------------------------------------------------------
--spec load_fixture_from_file(atom(), nonempty_string() | kz_term:ne_binary()) ->
-                                    object() |
-                                    {'error', atom()}.
-
--spec load_fixture_from_file(atom(), nonempty_string() | kz_term:ne_binary(), iodata()) ->
-                                    object() |
-                                    {'error', atom()}.
-
+-spec load_fixture_from_file(atom(), nonempty_string() | kz_term:ne_binary()) -> object() | {'error', atom()}.
 load_fixture_from_file(App, File) ->
     load_fixture_from_file(App, <<"couchdb">>, File).
 
+-spec load_fixture_from_file(atom(), nonempty_string() | kz_term:ne_binary(), iodata()) -> object() | {'error', atom()}.
 load_fixture_from_file(App, Dir, File) ->
     Path = list_to_binary([code:priv_dir(App), "/", kz_term:to_list(Dir), "/", kz_term:to_list(File)]),
     lager:debug("read fixture for kapp ~s from JSON file: ~s", [App, Path]),
@@ -1256,6 +1256,7 @@ normalize_key_char(C) -> C.
 -type search_replace_format() :: {kz_term:ne_binary(), kz_term:ne_binary()} |
                                  {kz_term:ne_binary(), kz_term:ne_binary(), fun((any()) -> any())}.
 -type search_replace_formatters() :: [search_replace_format()].
+
 -spec normalize_jobj(object(), kz_term:ne_binaries(), search_replace_formatters()) -> object().
 normalize_jobj(?JSON_WRAPPER(_)=JObj, RemoveKeys, SearchReplaceFormatters) ->
     normalize_jobj(

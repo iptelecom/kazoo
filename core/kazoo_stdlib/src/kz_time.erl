@@ -294,7 +294,6 @@ elapsed_us(Start, Now)
 -spec now() -> now().
 now() -> os:timestamp().
 
-
 -spec now_s() -> gregorian_seconds().
 now_s() ->  erlang:system_time('seconds') + ?UNIX_EPOCH_IN_GREGORIAN.
 
@@ -318,7 +317,6 @@ now_s({_,_,_}=Now) ->
 
 unix_us_to_gregorian_us(UnixUS) ->
     UnixUS + (?UNIX_EPOCH_IN_GREGORIAN * ?MICROSECONDS_IN_SECOND).
-
 
 -spec format_date() -> binary().
 format_date() ->
