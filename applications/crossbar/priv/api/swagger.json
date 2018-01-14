@@ -27111,6 +27111,7 @@
                     "type": "integer"
                 },
                 "profiles": {
+                    "default": {},
                     "properties": {
                         "default": {
                             "default": {
@@ -27138,7 +27139,8 @@
                             "description": "conferences page",
                             "type": "object"
                         }
-                    }
+                    },
+                    "type": "object"
                 },
                 "review_name": {
                     "default": false,
@@ -28363,6 +28365,11 @@
                 "redirect_via_proxy": {
                     "default": true,
                     "description": "ecallmgr redirect via proxy",
+                    "type": "boolean"
+                },
+                "restrict_channel_event_publisher": {
+                    "default": true,
+                    "description": "ecallmgr restrict_channel_event_publisher",
                     "type": "boolean"
                 },
                 "restrict_channel_state_publisher": {
