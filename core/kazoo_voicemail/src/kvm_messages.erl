@@ -1,10 +1,13 @@
 %%%-------------------------------------------------------------------
 %%% @copyright (C) 2018, 2600Hz
 %%% @doc
+%%% General operation on a list of voicemail messages.
+%%% @end
+%%% @author Hesaam Farhang
+%%% @author James Aimonetti
+%%% @author Karl Anderson
 %%%
 %%% @end
-%%% @contributors
-%%%   Hesaam Farhang
 %%%-------------------------------------------------------------------
 -module(kvm_messages).
 
@@ -54,7 +57,8 @@
 %% as key's value
 %% @end
 %%--------------------------------------------------------------------
--spec get(kz_term:ne_binary()) -> get_map().
+-spec get(kz_term:ne_binary() %% the account id
+         ) -> get_map(). %% a beautiful map
 get(AccountId) ->
     ViewOpts = [{'startkey', []}
                ,{'endkey', []}
@@ -85,16 +89,17 @@ get(AccountId, Box) ->
 %% duration in whatever folder they are in.
 %%
 %% Note: returns a map with box_id as key, and a map of count of
-%% each folder as box_id key's value
-%%
-%% @equiv Same as calling count_per_folder/1
+%% each folder as box_id key's value, {@link count_per_folder/1}.
 %%
 %% Example:
-%% #{<<"5ee08e5e8d4cac3d0fbc2f23870e5dbc">> =>
-%%       #{<<"new">> => 7,<<"non_deleted">> => 8,<<"saved">> => 1,
-%%         <<"total">> => 8},
-%%   <<"79371edb968bf5086d61a41b1849ab8e">> =>
-%%       #{<<"new">> => 7,<<"non_deleted">> => 7,<<"total">> => 7}}
+%%
+%% ```
+%%     #{<<"5ee08e5e8d4cac3d0fbc2f23870e5dbc">> =>
+%%        #{<<"new">> => 7,<<"non_deleted">> => 8,<<"saved">> => 1,
+%%          <<"total">> => 8},
+%%       <<"79371edb968bf5086d61a41b1849ab8e">> =>
+%%        #{<<"new">> => 7,<<"non_deleted">> => 7,<<"total">> => 7}}
+%% '''
 %% @end
 %%--------------------------------------------------------------------
 -spec count(kz_term:ne_binary()) -> count_map().
@@ -176,11 +181,11 @@ sum_owner_mailboxes(AccountId, [BoxId|BoxIds], {New, Saved}) ->
 %% each folder as box_id key's value
 %%
 %% Example:
-%% #{<<"5ee08e5e8d4cac3d0fbc2f23870e5dbc">> =>
+%% ```#{<<"5ee08e5e8d4cac3d0fbc2f23870e5dbc">> =>
 %%       #{<<"new">> => 7,<<"non_deleted">> => 8,<<"saved">> => 1,
 %%         <<"total">> => 8},
 %%   <<"79371edb968bf5086d61a41b1849ab8e">> =>
-%%       #{<<"new">> => 7,<<"non_deleted">> => 7,<<"total">> => 7}}
+%%       #{<<"new">> => 7,<<"non_deleted">> => 7,<<"total">> => 7}}'''
 %% @end
 %%--------------------------------------------------------------------
 -spec count_per_folder(kz_term:ne_binary()) -> count_map().
