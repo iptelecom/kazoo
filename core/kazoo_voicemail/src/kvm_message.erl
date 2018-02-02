@@ -1,11 +1,9 @@
-%%%-------------------------------------------------------------------
 %%% @copyright (C) 2018, 2600Hz
 %%% @doc
 %%% Provide functions to create and manage a single voicemail message.
 %%%
 %%% @author Hesaam Farhang
 %%% @end
-%%%-------------------------------------------------------------------
 -module(kvm_message).
 
 -export([new/2, forward_message/4
@@ -57,10 +55,9 @@
 %% </dl>
 %% @end
 
--spec new(Call, Options) -> Result
-    when Call::kapps_call:call(),
-         Options::kz_term:proplist(),
-         Result::new_msg_ret().
+-spec new(Call, Options) -> Result when Call::kapps_call:call(),
+                                        Options::kz_term:proplist(),
+                                        Result::new_msg_ret().
 new(Call, Options) ->
     BoxId = props:get_value(<<"Box-Id">>, Options),
     %% FIXME: dis guy is file size not audio duration
@@ -109,12 +106,12 @@ new(Call, Options) ->
 %% @see new/2
 %% @end
 
--spec forward_message(Call, Metadata, SrcBoxId, Options) -> Result
-    when Call::kapps_call:call(),
-         Metadata::kz_json:object(),
-         SrcBoxId::kz_term:ne_binary(),
-         Options::kz_term:proplist(),
-         Result::new_msg_ret().
+-spec forward_message(Call, Metadata, SrcBoxId, Options) ->
+                             Result when Call::kapps_call:call(),
+                                         Metadata::kz_json:object(),
+                                         SrcBoxId::kz_term:ne_binary(),
+                                         Options::kz_term:proplist(),
+                                         Result::new_msg_ret().
 forward_message(Call, Metadata, SrcBoxId, Options) ->
     case props:get_value(<<"Attachment-Name">>, Options) of
         'undefined' ->
@@ -161,9 +158,7 @@ new_forward_message(Call, Metadata, SrcBoxId, Options) ->
 
 %% @equiv fetch(AccountId, MessageId, 'undefined')
 
--spec fetch(AccountId, MessageId) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-         MessageId::kz_term:ne_binary().
+-spec fetch(AccountId, MessageId) -> db_ret() when AccountId::kz_term:ne_binary(), MessageId::kz_term:ne_binary().
 fetch(AccountId, MessageId) ->
     fetch(AccountId, MessageId, 'undefined').
 
@@ -176,10 +171,9 @@ fetch(AccountId, MessageId) ->
 %% to the specified mailbox ID or not. If not `{error, not_found}' will be returned.
 %% @end
 
--spec fetch(AccountId, MessageId, BoxId) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-         MessageId::kz_term:ne_binary(),
-         BoxId::kz_term:api_ne_binary().
+-spec fetch(AccountId, MessageId, BoxId) -> db_ret() when AccountId::kz_term:ne_binary(),
+                                                          MessageId::kz_term:ne_binary(),
+                                                          BoxId::kz_term:api_ne_binary().
 fetch(AccountId, MessageId, BoxId) ->
     RetenTimestamp = kz_time:now_s() - kvm_util:retention_seconds(AccountId),
     {_, DbRet} = do_fetch(AccountId, MessageId, BoxId, RetenTimestamp),
@@ -204,9 +198,7 @@ do_fetch(AccountId, MessageId, BoxId, RetenTimestamp) ->
 
 %% @equiv message(AccountId, MessageId, 'undefined')
 
--spec message(AccountId, MessageId) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-         MessageId::kz_term:ne_binary().
+-spec message(AccountId, MessageId) -> db_ret() when AccountId::kz_term:ne_binary(), MessageId::kz_term:ne_binary().
 message(AccountId, MessageId) ->
     message(AccountId, MessageId, 'undefined').
 
@@ -217,10 +209,9 @@ message(AccountId, MessageId) ->
 %% @see fetch/2
 %% @end
 
--spec message(AccountId, MessageId, BoxId) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-        MessageId::kz_term:ne_binary(),
-        BoxId::kz_term:api_ne_binary().
+-spec message(AccountId, MessageId, BoxId) -> db_ret() when AccountId::kz_term:ne_binary(),
+                                                            MessageId::kz_term:ne_binary(),
+                                                            BoxId::kz_term:api_ne_binary().
 message(AccountId, MessageId, BoxId) ->
     case fetch(AccountId, MessageId, BoxId) of
         {'ok', JObj} ->
@@ -235,10 +226,9 @@ message(AccountId, MessageId, BoxId) ->
 %% Note: For use by {@link cf_voicemail} only.
 %% @end
 
--spec set_folder(Folder, Message, AccountId) -> db_ret()
-    when Folder::kz_term:ne_binary(),
-         Message::kz_json:object(),
-         AccountId::kz_term:ne_binary().
+-spec set_folder(Folder, Message, AccountId) -> db_ret() when Folder::kz_term:ne_binary(),
+                                                              Message::kz_json:object(),
+                                                              AccountId::kz_term:ne_binary().
 set_folder(Folder, Message, AccountId) ->
     MessageId = kzd_box_message:media_id(Message),
     FromFolder = kzd_box_message:folder(Message, ?VM_FOLDER_NEW),
@@ -259,11 +249,10 @@ maybe_set_folder(_FromFolder, ToFolder, MessageId, AccountId, _Msg) ->
 
 %% @equiv change_folder(Folder, Message, AccountId, BoxId, [])
 
--spec change_folder(Folder, Message, AccountId, BoxId) -> db_ret()
-    when Folder::vm_folder(),
-         Message::message(),
-         AccountId::kz_term:ne_binary(),
-         BoxId::kz_term:api_binary().
+-spec change_folder(Folder, Message, AccountId, BoxId) -> db_ret() when Folder::vm_folder(),
+                                                                        Message::message(),
+                                                                        AccountId::kz_term:ne_binary(),
+                                                                        BoxId::kz_term:api_binary().
 change_folder(Folder, Message, AccountId, BoxId) ->
     change_folder(Folder, Message, AccountId, BoxId, []).
 
@@ -274,12 +263,12 @@ change_folder(Folder, Message, AccountId, BoxId) ->
 %%       otherwise it just move to deleted folder (for recovering later by user).
 %% @end
 
--spec change_folder(Folder, Message, AccountId, BoxId, Functions) -> db_ret()
-    when Folder::vm_folder(),
-         Message::message(),
-         AccountId::kz_term:ne_binary(),
-         BoxId::kz_term:api_binary(),
-         Functions::update_funs().
+-spec change_folder(Folder, Message, AccountId, BoxId, Functions) ->
+                           db_ret() when Folder::vm_folder(),
+                                         Message::message(),
+                                         AccountId::kz_term:ne_binary(),
+                                         BoxId::kz_term:api_binary(),
+                                         Functions::update_funs().
 change_folder(Folder, Message, AccountId, BoxId, Funs0) ->
     Funs = [fun(J) -> kzd_box_message:apply_folder(Folder, J) end
             | Funs0
@@ -308,11 +297,11 @@ update(AccountId, BoxId, Message) ->
 %% and error `{error, <<"prior_to_retention_duration">>}' will be returned instead.
 %% @end
 
--spec update(AccountId, BoxId, Message, Functions) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-         BoxId::kz_term:api_ne_binary(),
-         Message::message(),
-         Functions::update_funs().
+-spec update(AccountId, BoxId, Message, Functions) ->
+                    db_ret() when AccountId::kz_term:ne_binary(),
+                                  BoxId::kz_term:api_ne_binary(),
+                                  Message::message(),
+                                  Functions::update_funs().
 update(AccountId, BoxId, ?NE_BINARY = MsgId, Funs) ->
     RetenTimestamp = kz_time:now_s() - kvm_util:retention_seconds(AccountId),
     case do_fetch(AccountId, MsgId, BoxId, RetenTimestamp) of
@@ -346,11 +335,11 @@ do_update(JObj, Funs) ->
 
 %% @equiv move_to_vmbox(AccountId, Things, OldBoxId, NewBoxId, [])
 
--spec move_to_vmbox(AccountId, Message, OldBoxId, NewBoxId) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-         Message::message(),
-         OldBoxId::kz_term:ne_binary(),
-         NewBoxId::kz_term:ne_binary().
+-spec move_to_vmbox(AccountId, Message, OldBoxId, NewBoxId) ->
+                           db_ret() when AccountId::kz_term:ne_binary(),
+                                         Message::message(),
+                                         OldBoxId::kz_term:ne_binary(),
+                                         NewBoxId::kz_term:ne_binary().
 move_to_vmbox(AccountId, Things, OldBoxId, NewBoxId) ->
     move_to_vmbox(AccountId, Things, OldBoxId, NewBoxId, []).
 
@@ -361,12 +350,12 @@ move_to_vmbox(AccountId, Things, OldBoxId, NewBoxId) ->
 %% @see maybe_do_move/7
 %% @end
 
--spec move_to_vmbox(AccountId, Message, OldBoxId, NewBoxId, Functions) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-         Message::message(),
-         OldBoxId::kz_term:ne_binary(),
-         NewBoxId::kz_term:ne_binary(),
-         Functions::update_funs().
+-spec move_to_vmbox(AccountId, Message, OldBoxId, NewBoxId, Functions) ->
+                           db_ret() when AccountId::kz_term:ne_binary(),
+                                         Message::message(),
+                                         OldBoxId::kz_term:ne_binary(),
+                                         NewBoxId::kz_term:ne_binary(),
+                                         Functions::update_funs().
 move_to_vmbox(AccountId, ?NE_BINARY = FromId, OldBoxId, NewBoxId, Funs) ->
     AccountDb = kvm_util:get_db(AccountId),
     case kz_datamgr:open_cache_doc(AccountDb, NewBoxId) of
@@ -388,14 +377,14 @@ move_to_vmbox(AccountId, JObj, OldBoxId, NewBoxId, Funs) ->
 %% It calls by {@link kvm_messages:move_to_vmbox/5}
 %% @end
 
--spec maybe_do_move(AccountId, MessageId, OldBoxId, NewBoxId, NewBoxJObj, Functions, RetenTimestamp) -> db_ret()
-    when AccountId::kz_term:ne_binary(),
-         MessageId::kz_term:ne_binary(),
-         OldBoxId::kz_term:ne_binary(),
-         NewBoxId::kz_term:ne_binary(),
-         NewBoxJObj::kz_json:object(),
-         Functions::update_funs(),
-         RetenTimestamp::kz_time:gregorian_seconds().
+-spec maybe_do_move(AccountId, MessageId, OldBoxId, NewBoxId, NewBoxJObj, Functions, RetenTimestamp) ->
+                           db_ret() when AccountId::kz_term:ne_binary(),
+                                         MessageId::kz_term:ne_binary(),
+                                         OldBoxId::kz_term:ne_binary(),
+                                         NewBoxId::kz_term:ne_binary(),
+                                         NewBoxJObj::kz_json:object(),
+                                         Functions::update_funs(),
+                                         RetenTimestamp::kz_time:gregorian_seconds().
 maybe_do_move(AccountId, FromId, OldBoxId, NewBoxId, NBoxJ, Funs, RetenTimestamp) ->
     case do_fetch(AccountId, FromId, OldBoxId, RetenTimestamp) of
         {'true', {'ok', JObj}} ->
@@ -439,11 +428,11 @@ do_move(AccountId, FromId, OldBoxId, NewBoxId, NBoxJ, Funs) ->
 
 %% @equiv copy_to_vmboxes(AccountId, MsgThing, OldBoxId, NewBoxIds, [])
 
--spec copy_to_vmboxes(AccountId, Message, OldBoxId, NewBoxIds) -> kz_json:object()
-    when AccountId::kz_term:ne_binary(),
-         Message::message(),
-         OldBoxId::kz_term:ne_binary(),
-         NewBoxIds::kz_term:ne_binary() | kz_term:ne_binaries().
+-spec copy_to_vmboxes(AccountId, Message, OldBoxId, NewBoxIds) ->
+                             kz_json:object() when AccountId::kz_term:ne_binary(),
+                                                   Message::message(),
+                                                   OldBoxId::kz_term:ne_binary(),
+                                                   NewBoxIds::kz_term:ne_binary() | kz_term:ne_binaries().
 copy_to_vmboxes(AccountId, MsgThing, OldBoxId, NewBoxIds) ->
     copy_to_vmboxes(AccountId, MsgThing, OldBoxId, NewBoxIds, []).
 
@@ -464,12 +453,12 @@ copy_to_vmboxes(AccountId, MsgThing, OldBoxId, NewBoxIds) ->
 %% '''
 %% @end
 
--spec copy_to_vmboxes(AccountId, MessageId, OldBoxId, NewBoxIds, Functions) -> kz_json:object()
-    when AccountId::kz_term:ne_binary(),
-         MessageId::message(),
-         OldBoxId::kz_term:ne_binary(),
-         NewBoxIds::kz_term:ne_binary() | kz_term:ne_binaries(),
-         Functions::update_funs().
+-spec copy_to_vmboxes(AccountId, MessageId, OldBoxId, NewBoxIds, Functions) ->
+                             kz_json:object() when AccountId::kz_term:ne_binary(),
+                                                   MessageId::message(),
+                                                   OldBoxId::kz_term:ne_binary(),
+                                                   NewBoxIds::kz_term:ne_binary() | kz_term:ne_binaries(),
+                                                   Functions::update_funs().
 copy_to_vmboxes(AccountId, MessageId, OldBoxId, ?NE_BINARY = NewBoxId, Funs) ->
     copy_to_vmboxes(AccountId, MessageId, OldBoxId, [NewBoxId], Funs);
 copy_to_vmboxes(AccountId, ?NE_BINARY = MessageId, OldBoxId, NewBoxIds, Funs) ->
@@ -490,14 +479,14 @@ copy_to_vmboxes(AccountId, JObj, OldBoxId, NewBoxIds, Funs) ->
 %% It calls by {@link kvm_messages:copy_to_vmboxes/5}
 %% @end
 
--spec maybe_copy_to_vmboxes(AccountId, FromId, OldBoxId, NewBoxIds, Acc, Functions, RetenTimestamp) -> bulk_map()
-    when AccountId::kz_term:ne_binary(),
-         FromId::kz_term:ne_binary(),
-         OldBoxId::kz_term:ne_binary(),
-         NewBoxIds::kz_term:ne_binaries(),
-         Acc::bulk_map(),
-         Functions::update_funs(),
-         RetenTimestamp::kz_time:gregorian_seconds().
+-spec maybe_copy_to_vmboxes(AccountId, FromId, OldBoxId, NewBoxIds, Acc, Functions, RetenTimestamp) ->
+                                   bulk_map() when AccountId::kz_term:ne_binary(),
+                                                   FromId::kz_term:ne_binary(),
+                                                   OldBoxId::kz_term:ne_binary(),
+                                                   NewBoxIds::kz_term:ne_binaries(),
+                                                   Acc::bulk_map(),
+                                                   Functions::update_funs(),
+                                                   RetenTimestamp::kz_time:gregorian_seconds().
 maybe_copy_to_vmboxes(AccountId, FromId, OldBoxId, NewBoxIds, CopyMap, Funs, RetenTimestamp) ->
     case do_fetch(AccountId, FromId, OldBoxId, RetenTimestamp) of
         {'true', {'ok', JObj}} ->
@@ -594,9 +583,7 @@ move_copy_final_check(AccountId, FromId, ToId) ->
 %% @doc Get Url of the media file from media server.
 %% @end
 
--spec media_url(AccountId, Message) -> binary()
-    when AccountId::kz_term:ne_binary(),
-         Message::message().
+-spec media_url(AccountId, Message) -> binary() when AccountId::kz_term:ne_binary(), Message::message().
 media_url(AccountId, ?NE_BINARY = MessageId) ->
     case fetch(AccountId, MessageId) of
         {'ok', Message} ->
