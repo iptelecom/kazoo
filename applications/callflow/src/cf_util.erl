@@ -60,7 +60,6 @@
 -define(VM_CACHE_KEY(Db, Id), {?MODULE, 'vmbox', Db, Id}).
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -159,7 +158,6 @@ manual_presence_resp(Username, Realm, JObj) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -214,7 +212,6 @@ mwi_resp(Username, Realm, OwnerId, AccountDb, JObj) ->
     kz_endpoint:send_mwi_update(New, Saved, Username, Realm, JObj).
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -232,7 +229,6 @@ unsolicited_endpoint_mwi_update(AccountDb, EndpointId) ->
     kz_endpoint:unsolicited_endpoint_mwi_update(AccountDb, EndpointId).
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -242,7 +238,6 @@ alpha_to_dialpad(Value) ->
     << <<(dialpad_digit(C))>> || <<C>> <= kz_term:to_lower_binary(Value), is_alpha(C) >>.
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -253,7 +248,6 @@ is_alpha(Char) ->
         andalso Char >= $a.
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -287,7 +281,6 @@ dialpad_digit(WXYZ) when WXYZ =:= $w
                          orelse WXYZ =:= $z -> $9.
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -320,7 +313,6 @@ get_owner_ids_by_sip_username(AccountDb, Username) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -352,7 +344,6 @@ get_endpoint_id_by_sip_username(AccountDb, Username) ->
     end.
 
 %%-----------------------------------------------------------------------------
-%% @public
 %% @doc
 %%
 %% @end
@@ -374,7 +365,6 @@ get_operator_callflow(Account) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %% Look for children branches to handle the failure replies of
 %% certain actions, like cf_offnet and cf_resources
@@ -408,7 +398,6 @@ handle_bridge_failure(Cause, Code, Call) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @public
 %% @doc
 %% Send and wait for a call failure cause response
 %% @end
