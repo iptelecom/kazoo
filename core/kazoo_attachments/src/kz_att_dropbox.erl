@@ -55,7 +55,7 @@ put_attachment(Settings, DbName, DocId, AName, Contents, _Options) ->
 fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
     case kz_json:get_value(<<"dropbox">>, HandlerProps) of
         'undefined' ->
-            gen_attachment:error_response(400, 'invalid_data');
+            kzs_attachments:error_response(400, 'invalid_data');
         GData ->
             {Settings, ContentId} = binary_to_term(base64:decode(GData)),
             Authorization = dropbox_token(Settings),
@@ -99,13 +99,13 @@ dropbox_token(#{oauth_doc_id := TokenDocId}) ->
 
 -spec dropbox_post(binary(), kz_term:proplist(), binary()) ->
                           {'ok', binary(), [{binary(), binary()}]} |
-                          gen_attachment:error_response().
+                          kzs_attachments:error_response().
 dropbox_post(Url, Headers, Body) ->
     case kz_http:post(Url, Headers, Body) of
         {'ok', 200, ResponseHeaders, ResponseBody} ->
             BodyJObj = kz_json:decode(ResponseBody),
             case kz_json:get_value(<<"id">>, BodyJObj) of
-                undefined -> gen_attachment:error_response(400, 'return_id_missing');
+                undefined -> kzs_attachments:error_response(400, 'return_id_missing');
                 ContentId -> {'ok', ContentId, [{<<"body">>, BodyJObj} | kz_att_util:headers_as_binaries(ResponseHeaders)]}
             end;
         Resp ->

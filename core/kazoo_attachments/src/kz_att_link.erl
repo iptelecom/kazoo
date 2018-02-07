@@ -40,7 +40,7 @@ put_attachment(_Params, _DbName, _DocId, _AName, _Contents, Options) ->
             {'ok', [{'attachment', Props}]};
         Missing ->
             Error = <<"missing required : ", (kz_binary:join(Missing, <<", ">>))/binary>>,
-            gen_attachment:error_response(400, Error)
+            kzs_attachments:error_response(400, Error)
     end.
 
 -spec fetch_attachment(gen_attachment:handler_props()
@@ -62,10 +62,10 @@ get_att_name(HandlerProps) ->
     DocId = kz_json:get_value(<<"att_docid">>, HandlerProps),
     case kz_datamgr:open_cache_doc(DbName, DocId) of
         {'ok', JObj} -> maybe_fetch_attachment(HandlerProps, kz_doc:attachment_names(JObj));
-        _ -> gen_attachment:error_response(404, 'not_found')
+        _ -> kzs_attachments:error_response(404, 'not_found')
     end.
 
-maybe_fetch_attachment(_HandlerProps, []) -> gen_attachment:error_response(404, 'not_found');
+maybe_fetch_attachment(_HandlerProps, []) -> kzs_attachments:error_response(404, 'not_found');
 maybe_fetch_attachment(HandlerProps, [AName | _]) ->
     fetch_attachment(HandlerProps, AName).
 
@@ -77,14 +77,14 @@ fetch_attachment(HandlerProps, AName) ->
             Resp;
         {'error', Reason} = _E when is_atom(Reason) ->
             lager:debug("Error fetching attachment: ~p", [_E]),
-            gen_attachment:error_response(400, Reason);
+            kzs_attachments:error_response(400, Reason);
         {'error', Reason} = _E when is_integer(Reason) ->
             lager:debug("Error fetching attachment: ~p", [_E]),
-            gen_attachment:error_response(Reason, <<"Error fetching the attachment.">>);
+            kzs_attachments:error_response(Reason, <<"Error fetching the attachment.">>);
         {'error', {Code, Body}} = _E when is_integer(Code) ->
             lager:debug("Error fetching attachment: ~p", [_E]),
-            gen_attachment:error_response(Code, Body);
+            kzs_attachments:error_response(Code, Body);
         {'error', Reason} = _E when is_tuple(Reason) ->
             lager:debug("Error fetching attachment: ~p", [_E]),
-            gen_attachment:error_response(400, kz_binary:join(tuple_to_list(Reason)))
+            kzs_attachments:error_response(400, kz_binary:join(tuple_to_list(Reason)))
     end.

@@ -64,7 +64,7 @@ put_attachment(Settings, DbName, DocId, AName, Contents, Options) ->
 fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
     case kz_json:get_value(<<"gstorage">>, HandlerProps) of
         'undefined' ->
-            gen_attachment:error_response(400, 'invalid_data');
+            kzs_attachments:error_response(400, 'invalid_data');
         GData ->
             {#{bucket := Bucket} = Settings, ContentId} = binary_to_term(base64:decode(GData)),
             Authorization = gstorage_token(Settings),
@@ -112,7 +112,7 @@ gstorage_token(#{oauth_app_id := AppId}) ->
 -spec send_attachment(binary(), kz_term:ne_binary(), kz_term:ne_binary(), binary(), kz_term:proplist(), binary()) ->
                              {'ok', kz_term:proplist()} |
                              {'ok', kz_term:ne_binary(), kz_term:proplist()} |
-                             gen_attachment:error_response().
+                             kzs_attachments:error_response().
 send_attachment(Authorization, Bucket, AName, CT, Options, Contents) ->
     JObj = kz_json:from_list(
              props:filter_empty(

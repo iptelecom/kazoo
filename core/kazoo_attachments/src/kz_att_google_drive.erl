@@ -44,7 +44,7 @@ put_attachment(#{oauth_doc_id := TokenDocId}=Settings, DbName, DocId, AName, Con
     CT = kz_mime:from_filename(AName),
     {Folder, Name} = resolve_path(Settings, {DbName, DocId, AName}, Authorization),
     Resp =  send_attachment(Authorization, Folder, TokenDocId, Name, CT, Options, Contents),
-    case gen_attachment:is_error_response(Resp) of
+    case kzs_attachments:is_error_response(Resp) of
         true when Folder /= [<<"root">>] ->
             send_attachment(Authorization, [<<"root">>], TokenDocId, Name, CT, Options, Contents);
         Else -> Else
@@ -58,7 +58,7 @@ put_attachment(#{oauth_doc_id := TokenDocId}=Settings, DbName, DocId, AName, Con
 fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
     case kz_json:get_value(<<"gdrive">>, HandlerProps) of
         'undefined' ->
-            gen_attachment:error_response(400, 'invalid_data');
+            kzs_attachments:error_response(400, 'invalid_data');
         GData ->
             {TokenDocId, ContentId} = binary_to_term(base64:decode(GData)),
             {'ok', #{token := #{authorization := Authorization}}} = kz_auth_client:token_for_auth_id(TokenDocId, ?DRV_TOKEN_OPTIONS),
@@ -168,13 +168,13 @@ gdrive_format_url(Map, AttInfo) ->
     kz_att_util:format_url(Map, AttInfo, gdrive_default_fields()).
 
 -spec gdrive_post(binary(), kz_term:proplist(), binary()) -> {'ok', kz_term:ne_binary(), kz_term:proplist()} |
-                                                             gen_attachment:error_response().
+                                                             kzs_attachments:error_response().
 gdrive_post(Url, Headers, Body) ->
     case kz_http:post(Url, Headers, Body) of
         {'ok', 200, ResponseHeaders, ResponseBody} ->
             BodyJObj = kz_json:decode(ResponseBody),
             case kz_json:get_value(<<"id">>, BodyJObj) of
-                undefined -> gen_attachment:error_response(400, 'return_id_missing');
+                undefined -> kzs_attachments:error_response(400, 'return_id_missing');
                 ContentId -> {'ok', ContentId, [{<<"body">>, BodyJObj} | kz_att_util:headers_as_binaries(ResponseHeaders)]}
             end;
         Resp ->

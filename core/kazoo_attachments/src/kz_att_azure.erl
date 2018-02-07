@@ -44,19 +44,19 @@ put_attachment(Settings, DbName, DocId, AName, Contents, _Options) ->
                        ]};
             {'error', ErrorCode} = _E when is_atom(ErrorCode) -> % from erlazure:execute_request/2
                 lager:error("error storing attachment in azure : ~p", [_E]),
-                gen_attachment:error_response(ErrorCode, <<"Error storing attachment in Azure">>);
+                kzs_attachments:error_response(ErrorCode, <<"Error storing attachment in Azure">>);
             {'error', ErrorBody} = _E -> % from erlazure:execute_request/2
                 lager:error("error storing attachment in azure : ~p", [_E]),
-                gen_attachment:error_response(400, ErrorBody);
+                kzs_attachments:error_response(400, ErrorBody);
             SomethingElse ->
                 lager:error("Failed to put the attachment to Azure: ~p", [SomethingElse]),
-                gen_attachment:error_response(400, <<"Something failed(?)">>)
+                kzs_attachments:error_response(400, <<"Something failed(?)">>)
         end
     catch
         _:{{{'case_clause', {'error', {'failed_connect', _}}}, _StackTrace}, _FnFailing} ->
             lager:debug("Failed to put the attachment.~nStackTrace: ~p~nFnFailing: ~p",
                         [_StackTrace, _FnFailing]),
-            gen_attachment:error_response(400, <<"Failed to connect. Check your settings">>)
+            kzs_attachments:error_response(400, <<"Failed to connect. Check your settings">>)
     end.
 
 
@@ -68,13 +68,13 @@ put_attachment(Settings, DbName, DocId, AName, Contents, _Options) ->
 fetch_attachment(HandlerProps, DbName, DocId, AName) ->
     case kz_json:get_value(<<"azure">>, HandlerProps) of
         'undefined' ->
-            gen_attachment:error_response(400, 'invalid_data');
+            kzs_attachments:error_response(400, 'invalid_data');
         AzureData ->
             {Settings, _ContentId} = binary_to_term(base64:decode(AzureData)),
             Pid = azure_pid(Settings),
             {Container, Name} = resolve_path(Settings, {DbName, DocId, AName}),
             case erlazure:get_blob(Pid, Container, Name) of
-                {'error', Reason} -> gen_attachment:error_response(400, Reason);
+                {'error', Reason} -> kzs_attachments:error_response(400, Reason);
                 {'ok', _RespBody} = Resp -> Resp
             end
     end.

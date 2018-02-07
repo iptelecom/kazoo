@@ -485,12 +485,12 @@ add_datamgr_error(AttId, Error, Context) ->
     crossbar_doc:handle_datamgr_errors(Error, AttId, Context).
 
 -spec add_att_settings_validation_error(kz_term:ne_binary()
-                                       ,gen_attachment:error_response()
+                                       ,kzs_attachments:error_response()
                                        ,cb_context:context()
                                        ) -> cb_context:context().
 add_att_settings_validation_error(AttId, ErrorResponse, Context) ->
-    ErrorCode = gen_attachment:error_code(ErrorResponse),
-    ErrorBody = gen_attachment:error_body(ErrorResponse),
+    ErrorCode = kzs_attachments:error_code(ErrorResponse),
+    ErrorBody = kzs_attachments:error_body(ErrorResponse),
     EmptyJObj = kz_json:new(),
     %% Some attachment handlers return a bitstring as the value for `ErrorBody` variable,
     %% some other return an encoded JSON object which is also a binary value but

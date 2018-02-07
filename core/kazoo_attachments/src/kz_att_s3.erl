@@ -50,7 +50,7 @@ put_attachment(Params, DbName, DocId, AName, Contents, _Options) ->
 fetch_attachment(Conn, DbName, DocId, AName) ->
     HandlerProps = kz_json:get_value(<<"handler_props">>, Conn, 'undefined'),
     case kz_json:get_value(<<"S3">>, Conn) of
-        'undefined' -> gen_attachment:error_response(400, 'invalid_data');
+        'undefined' -> kzs_attachments:error_response(400, 'invalid_data');
         S3 ->
             {Bucket, FilePath, Config} = aws_bpc(S3, HandlerProps, {DbName, DocId, AName}),
             case get_object(Bucket, FilePath, Config) of
@@ -188,7 +188,7 @@ convert_kv({<<"etag">> = K, V}) ->
 convert_kv(KV) -> KV.
 
 -spec put_object(string(), string() | kz_term:ne_binary(), binary(), aws_config()) -> {ok, kz_term:proplist()} |
-                                                                                      gen_attachment:error_response().
+                                                                                      kzs_attachments:error_response().
 put_object(Bucket, FilePath, Contents,Config)
   when is_binary(FilePath) ->
     put_object(Bucket, kz_term:to_list(FilePath), Contents,Config);
@@ -202,7 +202,7 @@ put_object(Bucket, FilePath, Contents, #aws_config{s3_host=Host} = Config) ->
     end.
 
 -spec get_object(string(), string() | kz_term:ne_binary(), aws_config()) -> {ok, kz_term:proplist()} |
-                                                                            gen_attachment:error_response().
+                                                                            kzs_attachments:error_response().
 get_object(Bucket, FilePath, Config)
   when is_binary(FilePath) ->
     get_object(Bucket, kz_term:to_list(FilePath), Config);
@@ -221,14 +221,14 @@ get_object(Bucket, FilePath, #aws_config{s3_host=Host} = Config) ->
                       }
                      ,string()
                      ,string() | kz_term:ne_binary()
-                     ) -> gen_attachment:error_response().
+                     ) -> kzs_attachments:error_response().
 handle_s3_error({'aws_error', {'http_error', RespCode, _RespStatusLine, RespBody} = Reason}
                ,Host
                ,FilePath
                ) ->
     lager:debug("error saving attachment to ~s/~s : ~p", [Host, FilePath, Reason]),
-    gen_attachment:error_response(RespCode, RespBody);
+    kzs_attachments:error_response(RespCode, RespBody);
 handle_s3_error({'aws_error', {'socket_error', RespBody} = Reason}, Host, FilePath) ->
     lager:debug("error saving attachment to ~s/~s : ~p", [Host, FilePath, Reason]),
     Error = <<"Socket error: ", (io_lib:format("~p", [RespBody]))/binary>>,
-    gen_attachment:error_response(400, Error).
+    kzs_attachments:error_response(400, Error).

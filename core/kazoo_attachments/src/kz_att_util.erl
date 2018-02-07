@@ -165,16 +165,16 @@ encode_multipart_headers([{K, V} | Headers], Encoded) ->
 %% This function will take care for all the HTTP responses with HTTP code /= `200' and
 %% HTTP response errors coming from `kz_http' module.
 -spec handle_http_error_response(kz_http:req(), string(), kz_term:ne_binary()) ->
-                                        gen_attachment:error_response().
+                                        kzs_attachments:error_response().
 handle_http_error_response({'ok', RespCode, _RespHeaders, RespBody} = _E, Msg, _Url) ->
     lager:error("~p: ~p", [Msg, _E]),
-    gen_attachment:error_response(RespCode, RespBody);
+    kzs_attachments:error_response(RespCode, RespBody);
 handle_http_error_response({'error', {ErrorAtom, ErrorBody}} = _E, Msg, _Url)
   when is_atom(ErrorAtom) ->
     lager:error("~p: ~p", [Msg, _E]),
     Body = kz_binary:join([ErrorAtom, ErrorBody], <<": ">>),
-    gen_attachment:error_response(400, Body);
+    kzs_attachments:error_response(400, Body);
 handle_http_error_response(_E, Msg, Url) ->
     lager:error("~p: ~p", [Msg, _E]),
     LowerBinMsg = list_to_binary(string:to_lower(Msg)),
-    gen_attachment:error_response(400, <<LowerBinMsg/binary, " from url: ", Url/binary>>).
+    kzs_attachments:error_response(400, <<LowerBinMsg/binary, " from url: ", Url/binary>>).

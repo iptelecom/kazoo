@@ -15,6 +15,24 @@
         ,attachment_url/6
         ]).
 
+%% Error_response related
+%% Setter
+-export([error_response/2]).
+%% Getters
+-export([error_code/1, error_body/1]).
+%% Helper
+-export([is_error_response/1]).
+
+-type error_code()       :: pos_integer() | atom(). % 400, 404, 409, etc.
+-type error_body()       :: binary() | % encoded map()
+                            bitstring() | % <<"example">>
+                            atom(). % 'not_found' | 'return_id_missing' | etc.
+-opaque error_response() :: {'kzs_attachments_error', [{'error_code', error_code()} |
+                                                       {'error_body', error_body()}
+                                                      ]}.
+
+-export_type([error_response/0]).
+
 -include("kz_data.hrl").
 
 -define(KEY_STUB_ATTACHMENTS, <<"pvt_attachments">>).
@@ -190,3 +208,47 @@ attachment_url(#{server := {App, Conn}}, DbName, DocId, AttachmentId, 'undefined
     App:attachment_url(Conn, DbName, DocId, AttachmentId, Options);
 attachment_url(_, DbName, DocId, AttachmentId, Handler, Options) ->
     {'proxy', {DbName, DocId, AttachmentId, [{'handler', Handler} | Options]}}.
+
+%% =======================================================================================
+%% Error response
+%% =======================================================================================
+%% Note: Some functions have the `kz_datamgr:data_error()' type in its spec but it is not
+%%       being used, it is just to avoid dialyzer complaints because since `cb_storage' mod
+%%       is using `kazoo_attachments' app through `kz_datamgr' mod it (cb_storage) can not
+%%       get only opaque `error_response()' errors but also `data_error()' from kz_datamgr
+%%       and when you call error_code/1, error_body/1, or is_error_response/1 dialyzer
+%%       may think you're sending a `data_error()' instead of a `error_response()' value.
+%% Setter
+-spec error_response(error_code(), error_body()) -> error_response().
+error_response(ErrorCode, ErrorBody) ->
+    {'kzs_attachments_error', [{'error_code', ErrorCode}, {'error_body', ErrorBody}]}.
+
+%% Getters
+%% Read the note about `kz_datamgr:data_error()' starting `Error response' section
+-spec error_code(error_response()) -> error_code() | 'undefined'.
+error_code({'kzs_attachments_error', Reason}) ->
+    props:get_value('error_code', Reason).
+
+%% Read the note about `kz_datamgr:data_error()' starting `Error response' section
+-spec error_body(error_response()) -> error_body() | 'undefined'.
+error_body({'kzs_attachments_error', Reason}) ->
+    props:get_value('error_body', Reason).
+
+%% Helper(s)
+%% Read the note about `kz_datamgr:data_error()' starting `Error response' section
+-spec is_error_response(error_response() | kz_datamgr:data_error()) -> boolean().
+is_error_response({'kzs_attachments_error', ErrorProps}) when is_list(ErrorProps) ->
+    lists:all(fun check_error_response_element/1, ErrorProps);
+is_error_response(_) ->
+    'false'.
+
+-spec check_error_response_element(error_code() | error_body()) -> boolean().
+check_error_response_element({'error_code', Code}) ->
+    is_atom(Code)
+        orelse is_integer(Code);
+check_error_response_element({'error_body', Body}) ->
+    is_binary(Body)
+        orelse is_bitstring(Body)
+        orelse is_atom(Body);
+check_error_response_element(_) ->
+    'false'.

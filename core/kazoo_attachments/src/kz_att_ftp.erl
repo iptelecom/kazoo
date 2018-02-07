@@ -41,7 +41,7 @@ put_attachment(Params, DbName, DocId, AName, Contents, _Options) ->
             lager:debug("error '~p' uploading attachment ~s of document ~s/~s to ~s"
                        ,[Err, AName, DocId, DbName, Url]
                        ),
-            gen_attachment:error_response(400, Err)
+            kzs_attachments:error_response(400, Err)
     end.
 
 -spec fetch_attachment(gen_attachment:handler_props()
@@ -52,11 +52,11 @@ put_attachment(Params, DbName, DocId, AName, Contents, _Options) ->
 fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
     case kz_json:get_value(<<"url">>, HandlerProps) of
         'undefined' ->
-            gen_attachment:error_response(400, 'invalid_data');
+            kzs_attachments:error_response(400, 'invalid_data');
         Url ->
             case fetch_attachment(Url) of
                 {'ok', _Bin} = Resp -> Resp;
-                {'error', Reason} -> gen_attachment:error_response(400, Reason)
+                {'error', Reason} -> kzs_attachments:error_response(400, Reason)
             end
     end.
 

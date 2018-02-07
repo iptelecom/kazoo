@@ -87,7 +87,7 @@ put_attachment(Settings, DbName, DocId, AName, Contents, _Options) ->
                       ) -> gen_attachment:fetch_response().
 fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
     case kz_json:get_value(<<"onedrive">>, HandlerProps) of
-        'undefined' -> gen_attachment:error_response(400, 'invalid_data');
+        'undefined' -> kzs_attachments:error_response(400, 'invalid_data');
         GData ->
             {Settings, {DriveId, ContentId}} = binary_to_term(base64:decode(GData)),
             Authorization = onedrive_token(Settings, ?DRV_GET_TOKEN_OPTIONS),
@@ -128,7 +128,7 @@ onedrive_token(#{oauth_doc_id := TokenDocId}, Options) ->
     Authorization.
 
 -spec onedrive_put(binary(), kz_term:proplist(), binary()) ->
-                          {'ok', tuple(), kz_term:proplist()} | gen_attachment:error_response().
+                          {'ok', tuple(), kz_term:proplist()} | kzs_attachments:error_response().
 onedrive_put(Url, Headers, Body) ->
     case kz_http:put(Url, Headers, Body, ?GRAPH_HTTP_OPTIONS) of
         {'ok', Code, ResponseHeaders, ResponseBody}
@@ -139,9 +139,9 @@ onedrive_put(Url, Headers, Body) ->
             Id = kz_json:get_value(<<"id">>, BodyJObj),
             DriveId = kz_json:get_value([<<"parentReference">>, <<"driveId">>], BodyJObj),
             case {Id, DriveId} of
-                {undefined, undefined} -> gen_attachment:error_response(400, 'return_info_missing');
-                {undefined, _} -> gen_attachment:error_response(400, 'return_id_missing');
-                {_, undefined} -> gen_attachment:error_response(400, 'return_drive_missing');
+                {undefined, undefined} -> kzs_attachments:error_response(400, 'return_info_missing');
+                {undefined, _} -> kzs_attachments:error_response(400, 'return_id_missing');
+                {_, undefined} -> kzs_attachments:error_response(400, 'return_drive_missing');
                 _ -> {ok, {DriveId, Id}, [{<<"body">>, BodyJObj} | kz_att_util:headers_as_binaries(ResponseHeaders)]}
             end;
         Resp ->

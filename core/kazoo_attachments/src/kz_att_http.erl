@@ -46,7 +46,7 @@ put_attachment(Params, DbName, DocId, AName, Contents, Options) ->
                       ) -> gen_attachment:fetch_response().
 fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
     case kz_json:get_value(<<"url">>, HandlerProps) of
-        'undefined' -> gen_attachment:error_response(400, 'invalid_data');
+        'undefined' -> kzs_attachments:error_response(400, 'invalid_data');
         Url -> fetch_attachment(Url)
     end.
 
@@ -65,7 +65,7 @@ send_request(Url, Verb, Headers, Contents) ->
 
 send_request(_Url, _Verb, _Headers, _Contents, Redirects, _)
   when Redirects > ?MAX_REDIRECTS ->
-    gen_attachment:error_response(400, 'too_many_redirects');
+    kzs_attachments:error_response(400, 'too_many_redirects');
 send_request(Url, Verb, Headers, Contents, Redirects, Debug) ->
     case kz_http:req(Verb, Url, Headers, Contents) of
         {'ok', Code, ReplyHeaders, Body} when
@@ -87,7 +87,7 @@ maybe_redirect(ToUrl, Headers, Redirects, Debug, Fun) ->
     case props:get_value("location", Headers) of
         'undefined' ->
             lager:debug("request to ~s got redirection but no 'location' header was found", [ToUrl]),
-            gen_attachment:error_response(400, 'redirection_with_no_location');
+            kzs_attachments:error_response(400, 'redirection_with_no_location');
         Url ->
             maybe_redirect_loop(ToUrl, Url, Redirects, Debug, Fun)
     end.
@@ -99,7 +99,7 @@ maybe_redirect_loop(ToUrl, Url, Redirects, Debug, Fun) ->
             Fun(Url, Redirects + 1, Debug);
         _ ->
             lager:debug("the request ~s got redirect to ~s but this is already in the list of visited urls",[ToUrl, Url]),
-            gen_attachment:error_response(400, 'redirect_loop_detected')
+            kzs_attachments:error_response(400, 'redirect_loop_detected')
     end.
 
 add_debug(Debug, Url, Code, Headers) ->
@@ -122,7 +122,7 @@ fetch_attachment(URL) ->
                               gen_attachment:fetch_response().
 fetch_attachment(_Url, Redirects, _)
   when Redirects > ?MAX_REDIRECTS ->
-    gen_attachment:error_response(400, 'too_many_redirects');
+    kzs_attachments:error_response(400, 'too_many_redirects');
 fetch_attachment(Url, Redirects, Debug) ->
     case kz_http:get(Url) of
         {'ok', 200, _Headers, Body} ->
