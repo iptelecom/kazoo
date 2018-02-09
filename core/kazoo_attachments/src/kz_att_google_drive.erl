@@ -32,6 +32,10 @@
 %%% `gen_attachment' behaviour callbacks (API)
 %%%====================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
+%% @end
+%%--------------------------------------------------------------------
 -spec put_attachment(gen_attachment:settings()
                     ,gen_attachment:db_name()
                     ,gen_attachment:doc_id()
@@ -76,6 +80,10 @@ fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
 %%% Internal functions
 %%%====================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
+%% @end
+%%--------------------------------------------------------------------
 -spec get_json_from_url(kz_term:ne_binary(), kz_term:proplist()) -> {'ok', kz_json:object()} | {'error', any()}.
 get_json_from_url(Url, ReqHeaders) ->
     case kz_http:get(kz_term:to_list(Url), ReqHeaders, [{ssl, [{versions, ['tlsv1.2']}]}]) of

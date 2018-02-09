@@ -56,6 +56,11 @@
 %% ====================================================================
 %% `gen_attachment' behaviour callbacks (API)
 %% ====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @end
+%%--------------------------------------------------------------------
 -spec put_attachment(gen_attachment:settings()
                     ,gen_attachment:db_name()
                     ,gen_attachment:doc_id()
@@ -104,6 +109,11 @@ fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
 %% ====================================================================
 %% Internal functions
 %% ====================================================================
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @end
+%%--------------------------------------------------------------------
 -spec resolve_put_url(map(), attachment_info()) -> kz_term:ne_binary().
 resolve_put_url(Settings, AttInfo) ->
     Url = onedrive_format_url(Settings, AttInfo),
@@ -146,4 +156,3 @@ onedrive_put(Url, Headers, Body) ->
         Resp ->
             kz_att_util:handle_http_error_response(Resp, "Graph error", Url)
     end.
-

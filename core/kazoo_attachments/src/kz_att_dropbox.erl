@@ -23,6 +23,10 @@
 %%% `gen_attachment' behaviour callbacks (API)
 %%%====================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
+%% @end
+%%--------------------------------------------------------------------
 -spec put_attachment(gen_attachment:settings()
                     ,gen_attachment:db_name()
                     ,gen_attachment:doc_id()
@@ -78,6 +82,10 @@ fetch_attachment(HandlerProps, _DbName, _DocId, _AName) ->
 %%% Internal functions
 %%%====================================================================
 
+%%--------------------------------------------------------------------
+%% @doc
+%% @end
+%%--------------------------------------------------------------------
 -spec resolve_path(map(), attachment_info()) -> kz_term:ne_binary().
 resolve_path(Settings, AttInfo) ->
     <<"/", (dropbox_format_url(Settings, AttInfo))/binary>>.
