@@ -1,6 +1,7 @@
 %%%-------------------------------------------------------------------
 %%% @copyright (C) 2015-2018, 2600Hz
-%%% @doc HTTP helper functions for Kazoo
+%%% @doc
+%%% HTTP helper functions for Kazoo
 %%%
 %%%
 %%% @author Mark Magnusson
@@ -109,7 +110,8 @@ encode_char(Char) ->
     end.
 
 %%--------------------------------------------------------------------
-%% @doc Parses a query string and returns a list of key->value pairs.
+%% @doc
+%% Parses a query string and returns a list of key->value pairs.
 %% If the input string contains a ? then everything after the ? will
 %% be treated as the query string, otherwise the entire input is treated
 %% as the query string. The return key->value pairs will be urldecoded.
@@ -241,7 +243,8 @@ urlsplit_l(<<C, R/binary>>, Acc) ->
 
 %%--------------------------------------------------------------------
 %% @private
-%% @doc Splits and returns the path, query string, and fragment portions
+%% @doc
+%% Splits and returns the path, query string, and fragment portions
 %% of the URL
 %%--------------------------------------------------------------------
 -spec urlsplit_p(binary(), binary()) -> {binary(), binary(), binary()}.

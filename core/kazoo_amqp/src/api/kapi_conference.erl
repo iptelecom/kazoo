@@ -554,7 +554,8 @@
 focus_queue_name(Focus) -> <<(kz_term:to_binary(Focus))/binary, "_conference">>.
 
 %%--------------------------------------------------------------------
-%% @doc Create a tone on the channel - see wiki
+%% @doc
+%% Create a tone on the channel - see wiki
 %% Takes proplist, creates JSON string or error
 %% @end
 %%--------------------------------------------------------------------
@@ -586,7 +587,8 @@ say_v(JObj) -> say_v(kz_json:to_proplist(JObj)).
 tts_v(API) -> say_v(API).
 
 %%--------------------------------------------------------------------
-%% @doc Create a tone on the channel - see wiki
+%% @doc
+%% Create a tone on the channel - see wiki
 %% Takes proplist, creates JSON string or error
 %% @end
 %%--------------------------------------------------------------------
