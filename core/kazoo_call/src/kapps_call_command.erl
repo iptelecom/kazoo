@@ -1,8 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @copyright (C) 2012-2018, 2600Hz INC
 %%% @doc
-%%%
-%%%
 %%% @author Karl Anderson
 %%% @author James Aimonetti
 %%% @author Sponsored by Velvetech LLC, Implemented by SIPLABS LLC
@@ -2303,7 +2301,6 @@ b_flush(Call) -> wait_for_noop(Call, flush(Call)).
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec privacy(kapps_call:call()) -> 'ok'.
@@ -3047,7 +3044,6 @@ get_outbound_t38_settings('false') ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec get_inbound_t38_settings(boolean(), kz_term:api_binary() | boolean()) ->

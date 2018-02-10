@@ -1,8 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @copyright (C) 2011-2018, 2600Hz
 %%% @doc
-%%%
-%%%
 %%% @author Karl Anderson
 %%% @author James Aimonetti
 %%% @author Sponsored by Conversant Ltd, Implemented by SIPLABS, LLC (Ilya Ashchepkov)
@@ -61,7 +59,6 @@
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec presence_probe(kz_json:object(), kz_term:proplist()) -> any().
@@ -159,7 +156,6 @@ manual_presence_resp(Username, Realm, JObj) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec presence_mwi_query(kz_json:object(), kz_term:proplist()) -> 'ok'.
@@ -213,7 +209,6 @@ mwi_resp(Username, Realm, OwnerId, AccountDb, JObj) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec unsolicited_owner_mwi_update(kz_term:api_binary(), kz_term:api_binary()) ->
@@ -230,7 +225,6 @@ unsolicited_endpoint_mwi_update(AccountDb, EndpointId) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec alpha_to_dialpad(kz_term:ne_binary()) -> kz_term:ne_binary().
@@ -239,7 +233,6 @@ alpha_to_dialpad(Value) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec is_alpha(char()) -> boolean().
@@ -249,7 +242,6 @@ is_alpha(Char) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec dialpad_digit(97..122) -> 50..57.
@@ -282,7 +274,6 @@ dialpad_digit(WXYZ) when WXYZ =:= $w
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec owner_ids_by_sip_username(kz_term:ne_binary(), kz_term:ne_binary()) ->
@@ -314,7 +305,6 @@ get_owner_ids_by_sip_username(AccountDb, Username) ->
 
 %%--------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec endpoint_id_by_sip_username(kz_term:ne_binary(), kz_term:ne_binary()) ->
@@ -345,7 +335,6 @@ get_endpoint_id_by_sip_username(AccountDb, Username) ->
 
 %%-----------------------------------------------------------------------------
 %% @doc
-%%
 %% @end
 %%-----------------------------------------------------------------------------
 -spec get_operator_callflow(kz_term:ne_binary()) -> {'ok', kz_json:object()} |

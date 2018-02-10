@@ -1,8 +1,6 @@
 %%%-------------------------------------------------------------------
 %%% @copyright (C) 2011-2018, 2600Hz INC
 %%% @doc
-%%%
-%%%
 %%% @author Karl Anderson
 %%% @author James Aimonetti
 %%% @author Luis Azedo
@@ -1344,7 +1342,6 @@ create_call_fwd_endpoint(Endpoint, Properties, Call) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec create_mobile_endpoint(kz_json:object(), kz_json:object(), kapps_call:call()) ->
@@ -2065,7 +2062,6 @@ maybe_send_endpoint_mwi_update(AccountDb, JObj, 'true') ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -type vm_count() :: non_neg_integer().
@@ -2098,7 +2094,6 @@ vm_count_by_owner(<<_/binary>> = AccountDb, <<_/binary>> = OwnerId) ->
 %%--------------------------------------------------------------------
 %% @private
 %% @doc
-%%
 %% @end
 %%--------------------------------------------------------------------
 -spec get_endpoint_owner(kz_json:object()) -> kz_term:api_ne_binary().
