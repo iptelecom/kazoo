@@ -1,0 +1,25 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "_id": "callflows.set_iptel_ringgroup",
+    "description": "Validator for the set_variable callflow data object",
+    "properties": {
+        "channel": {
+            "default": "a",
+            "description": "Which channel to set the variable on",
+            "enum": [
+                "a",
+                "both"
+            ],
+            "type": "string"
+        },
+        "skip_module": {
+            "description": "When set to true this callflow action is skipped, advancing to the wildcard branch (if any)",
+            "type": "boolean"
+        },
+        "value": {
+            "description": "The value to set 'variable'",
+            "type": "string"
+        }
+    },
+    "type": "object"
+}
