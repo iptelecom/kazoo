@@ -22,6 +22,7 @@ Key | Description | Type | Default | Required | Support Level
 Example of the `flow` part of a callflow.
 
 This ***NEEDS*** to be before the ringgroup definition. 
+It is advised to reset this variable after the ringgroup, otherwise all AMQP messages will have this variable even after the ringgroup. 
 
 ```json
 {
@@ -57,7 +58,16 @@ This ***NEEDS*** to be before the ringgroup definition.
                             }
                         ]
                     },
-                    "children": {}
+                    "children": {
+                        "_": {
+                            "module": "set_iptel_ringgroup",
+                            "data": {
+                                "value": "false",
+                                "channel": "both"
+                            },
+                            "children": {}
+                        }
+                    }
                 }
             }
         },
