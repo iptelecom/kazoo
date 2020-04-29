@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc Karls Hackity Hack....
 %%% We want to block during startup until we have a AMQP connection
 %%% but due to the way `kz_amqp_mgr' is structured we can't block in
@@ -51,7 +51,7 @@ start_link() ->
 init([]) ->
     kz_util:put_callid(?DEFAULT_LOG_SYSTEM_ID),
     add_zones(get_config()),
-    lager:info("waiting for first amqp connection...", []),
+    lager:info("waiting for first amqp connection..."),
     kz_amqp_connections:wait_for_available(),
     timer:sleep(2 * ?MILLISECONDS_IN_SECOND),
     kz_amqp_util:targeted_exchange(),

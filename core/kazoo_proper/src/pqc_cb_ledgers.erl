@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2019-, 2600Hz
+%%% @copyright (C) 2020-, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -41,12 +41,12 @@ fetch(API, ?NE_BINARY=AccountId, ?NE_BINARY=AcceptType) ->
                            ).
 
 -spec fetch_by_source(pqc_cb_api:state(), kz_term:ne_binary(), kz_term:ne_binary()) ->
-                             pqc_cb_api:response().
+          pqc_cb_api:response().
 fetch_by_source(API, ?NE_BINARY=AccountId, ?NE_BINARY=SourceType) ->
     fetch_by_source(API, AccountId, SourceType, <<"application/json">>).
 
 -spec fetch_by_source(pqc_cb_api:state(), kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary()) ->
-                             pqc_cb_api:response().
+          pqc_cb_api:response().
 fetch_by_source(API, ?NE_BINARY=AccountId, SourceType, ?NE_BINARY=AcceptType) ->
     LedgersURL = ledgers_source_url(AccountId, SourceType),
     RequestHeaders = pqc_cb_api:request_headers(API, [{<<"accept">>, AcceptType}]),
@@ -64,7 +64,7 @@ fetch_by_source(API, ?NE_BINARY=AccountId, SourceType, ?NE_BINARY=AcceptType) ->
                            ).
 
 -spec credit(pqc_cb_api:state(), kz_term:ne_binary(), kzd_ledger:doc()) ->
-                    pqc_cb_api:response().
+          pqc_cb_api:response().
 credit(API, ?NE_BINARY=AccountId, Ledger) ->
     LedgersURL = ledgers_credit_url(AccountId),
     RequestHeaders = pqc_cb_api:request_headers(API),
@@ -81,7 +81,7 @@ credit(API, ?NE_BINARY=AccountId, Ledger) ->
                            ).
 
 -spec debit(pqc_cb_api:state(), kz_term:ne_binary(), kzd_ledger:doc()) ->
-                   pqc_cb_api:response().
+          pqc_cb_api:response().
 debit(API, ?NE_BINARY=AccountId, Ledger) ->
     LedgersURL = ledgers_debit_url(AccountId),
     RequestHeaders = pqc_cb_api:request_headers(API),
@@ -138,7 +138,7 @@ seq() ->
     API = pqc_kazoo_model:api(Model),
 
     PriorChunkSize = kapps_config:get_pos_integer(<<"crossbar">>, <<"load_view_chunk_size">>),
-    {'ok', _} = kapps_config:set_default(<<"crossbar">>, <<"load_view_chunk_size">>, 1),
+    _ = kapps_config:set_default(<<"crossbar">>, <<"load_view_chunk_size">>, 1),
 
     AccountResp = pqc_cb_accounts:create_account(API, hd(?ACCOUNT_NAMES)),
     lager:info("created account: ~s", [AccountResp]),
@@ -169,7 +169,7 @@ seq() ->
     lager:info("source fetch CSV: ~s", [SourceFetchCSV]),
     'true' = ledgers_exist_in_csv(SourceFetchCSV, [Ledger, Ledger2]),
 
-    {'ok', _} = kapps_config:set_default(<<"crossbar">>, <<"load_view_chunk_size">>, PriorChunkSize),
+    _ = kapps_config:set_default(<<"crossbar">>, <<"load_view_chunk_size">>, PriorChunkSize),
 
     cleanup(API),
     lager:info("FINISHED SEQ").
@@ -193,7 +193,8 @@ ledgers_exist(Data, [Ledger | Ledgers]) ->
         andalso ledgers_exist(Data, Ledgers).
 
 ledger_matches(Datum, Ledger) ->
-    kzd_ledgers:source_id(Datum) =:= kzd_ledgers:source_id(Ledger).
+    kzd_ledgers:source_id(Datum) =:= kzd_ledgers:source_id(Ledger)
+        andalso kzd_ledgers:unit_amount(Datum) =:= kzd_ledgers:unit_amount(Ledger).
 
 ledgers_exist_in_csv(CSV, Ledgers) ->
     {Header, Rows} = kz_csv:take_row(CSV),
@@ -247,6 +248,7 @@ ledger_doc() ->
                 ,{fun kzd_ledgers:set_usage_quantity/2, 1}
                 ,{fun kzd_ledgers:set_usage_unit/2, <<"Hz">>}
                 ,{fun kzd_ledgers:set_usage_type/2, <<"cycle">>}
+                ,{fun(J, V) -> kz_json:set_value(<<"amount">>, V, J) end, 2.6}
                 ]
                ).
 

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc Various utilities - a veritable cornucopia.
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -7,7 +7,7 @@
 %%%-----------------------------------------------------------------------------
 -module(kz_util).
 
--export([log_stacktrace/0, log_stacktrace/1, log_stacktrace/2
+-export([log_stacktrace/0, log_stacktrace/1, log_stacktrace/2, log_stacktrace/3
         ,format_account_id/1, format_account_id/2, format_account_id/3
         ,format_account_mod_id/1, format_account_mod_id/2, format_account_mod_id/3
         ,format_account_db/1
@@ -31,7 +31,7 @@
 -export([put_callid/1, get_callid/0, find_callid/1
         ,spawn/1, spawn/2
         ,spawn_link/1, spawn_link/2
-        ,spawn_monitor/2
+        ,spawn_monitor/2, spawn_monitor/3
         ,set_startup/0, startup/0
         ]).
 -export([get_event_type/1]).
@@ -92,6 +92,7 @@ log_stacktrace(Fmt, Args) ->
     ST = erlang:get_stacktrace(),
     log_stacktrace(ST, Fmt, Args).
 
+-spec log_stacktrace(list(), string(), list()) -> ok.
 log_stacktrace(ST, Fmt, Args) ->
     ?LOG_ERROR("stacktrace: " ++ Fmt, Args),
     _ = [log_stacktrace_mfa(M, F, A, Info)
@@ -267,7 +268,7 @@ format_resource_selectors_db(AccountId) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec format_account_id(kz_term:api_binary(), kz_time:year() | kz_term:ne_binary(), kz_time:month() | kz_term:ne_binary()) ->
-                               kz_term:api_binary().
+          kz_term:api_binary().
 format_account_id('undefined', _Year, _Month) -> 'undefined';
 format_account_id(AccountId, Year, Month) when not is_integer(Year) ->
     format_account_id(AccountId, kz_term:to_integer(Year), Month);
@@ -302,7 +303,7 @@ format_account_mod_id(AccountId, Timestamp) when is_integer(Timestamp) ->
 %%------------------------------------------------------------------------------
 
 -spec format_account_mod_id(kz_term:api_binary(), kz_time:year() | kz_term:ne_binary(), kz_time:month() | kz_term:ne_binary()) ->
-                                   kz_term:api_binary().
+          kz_term:api_binary().
 format_account_mod_id(AccountId, Year, Month) ->
     format_account_id(AccountId, Year, Month).
 
@@ -384,15 +385,15 @@ kz_log_md_clear() ->
 %% If time is elapsed, the sub-process is killed and returns `timeout'.
 %% @end
 %%------------------------------------------------------------------------------
--spec runs_in(number(), fun(), list()) -> {ok, any()} | timeout.
+-spec runs_in(number(), fun(), list()) -> {'ok', any()} | 'timeout'.
 runs_in(MaxTime, Fun, Arguments)
   when is_integer(MaxTime), MaxTime > 0 ->
     {Parent, Ref} = {self(), erlang:make_ref()},
     Child = ?MODULE:spawn(fun () -> Parent ! {Ref, erlang:apply(Fun, Arguments)} end),
-    receive {Ref, Result} -> {ok, Result}
+    receive {Ref, Result} -> {'ok', Result}
     after MaxTime ->
-            exit(Child, kill),
-            timeout
+            exit(Child, 'kill'),
+            'timeout'
     end;
 runs_in(MaxTime, Fun, Arguments)
   when is_number(MaxTime), MaxTime > 0 ->
@@ -401,41 +402,61 @@ runs_in(MaxTime, Fun, Arguments)
 -spec spawn(fun(), list()) -> pid().
 spawn(Fun, Arguments) ->
     CallId = get_callid(),
+    Application = kapps_util:get_application(),
     erlang:spawn(fun() ->
                          _ = put_callid(CallId),
+                         _ = kapps_util:put_application(Application),
                          erlang:apply(Fun, Arguments)
                  end).
 
 -spec spawn(fun(() -> any())) -> pid().
 spawn(Fun) ->
     CallId = get_callid(),
+    Application = kapps_util:get_application(),
     erlang:spawn(fun() ->
                          _ = put_callid(CallId),
+                         _ = kapps_util:put_application(Application),
                          Fun()
                  end).
 
 -spec spawn_link(fun(), list()) -> pid().
 spawn_link(Fun, Arguments) ->
     CallId = get_callid(),
+    Application = kapps_util:get_application(),
     erlang:spawn_link(fun () ->
                               _ = put_callid(CallId),
+                              _ = kapps_util:put_application(Application),
                               erlang:apply(Fun, Arguments)
                       end).
 
 -spec spawn_link(fun(() -> any())) -> pid().
 spawn_link(Fun) ->
     CallId = get_callid(),
+    Application = kapps_util:get_application(),
     erlang:spawn_link(fun() ->
                               _ = put_callid(CallId),
+                              _ = kapps_util:put_application(Application),
                               Fun()
                       end).
 
 -spec spawn_monitor(fun(), list()) -> kz_term:pid_ref().
 spawn_monitor(Fun, Arguments) ->
     CallId = get_callid(),
+    Application = kapps_util:get_application(),
     erlang:spawn_monitor(fun () ->
                                  _ = put_callid(CallId),
+                                 _ = kapps_util:put_application(Application),
                                  erlang:apply(Fun, Arguments)
+                         end).
+
+-spec spawn_monitor(module(), atom(), list()) -> kz_term:pid_ref().
+spawn_monitor(Module, Fun, Args) ->
+    CallId = get_callid(),
+    Application = kapps_util:get_application(),
+    erlang:spawn_monitor(fun () ->
+                                 _ = put_callid(CallId),
+                                 _ = kapps_util:put_application(Application),
+                                 erlang:apply(Module, Fun, Args)
                          end).
 
 
@@ -711,8 +732,10 @@ get_app(AppName) ->
 
 -spec application_version(atom()) -> kz_term:ne_binary().
 application_version(Application) ->
-    {'ok', Vsn} = application:get_key(Application, 'vsn'),
-    kz_term:to_binary(Vsn).
+    case application:get_key(Application, 'vsn') of
+        {'ok', Vsn} -> kz_term:to_binary(Vsn);
+        'undefined' -> <<"unknown">>
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc Like `lists:usort/1' but preserves original ordering.

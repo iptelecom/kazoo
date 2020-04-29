@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc
 %%% @author Luis Azedo
 %%% @end
@@ -96,7 +96,7 @@ start_link(AccountId) ->
 -spec init([kz_term:ne_binary()]) -> {'ok', state(), timeout()}.
 init([AccountId]) ->
     _ = kz_util:spawn(fun cleanup_jobs/1, [AccountId]),
-    State = #state{account_id=AccountId
+    State = #state{account_id = AccountId
                   ,limits = #{account => ?DEFAULT_LIMITS(AccountId) }
                   ,jobs = ?INIT_JOBS
                   },
@@ -207,7 +207,8 @@ distribute_jobs(#state{jobs=#{distribute := []
                              ,pending := #{}
                              ,running := #{}
                              }
-                      }=State) -> State;
+                      }=State) ->
+    State;
 distribute_jobs(#state{jobs=#{distribute := []
                              ,serialize := []
                              }
@@ -220,7 +221,8 @@ distribute_jobs(#state{jobs=#{distribute := []
     State#state{jobs=Jobs#{distribute => Serialize
                           ,serialize => []
                           }
-               ,stale=0};
+               ,stale=0
+               };
 distribute_jobs(#state{account_id=AccountId
                       ,limits= #{account := MaxAccount}
                       ,jobs=#{pending := Pending
@@ -342,7 +344,8 @@ check_pending(JobId, #{number := ToNumber, start := Start}, #{pending := Pending
                 };
         'false' ->
             Map
-    end.
+    end;
+check_pending(_JobId, _Running, Map) -> Map.
 
 -spec check_running(kz_term:ne_binary(), map(), map()) -> map().
 check_running(JobId, #{number := ToNumber, start := Start}, #{running := Running, numbers := Numbers} = Map) ->
@@ -354,7 +357,8 @@ check_running(JobId, #{number := ToNumber, start := Start}, #{running := Running
                 };
         'false' ->
             Map
-    end.
+    end;
+check_running(_JobId, _Running, Map) -> Map.
 
 -spec get_account_jobs(kz_term:ne_binary()) -> kz_json:objects().
 get_account_jobs(AccountId) ->

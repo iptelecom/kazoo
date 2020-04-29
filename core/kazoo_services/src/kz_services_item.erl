@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -62,6 +62,7 @@
 -export([has_changes/1]).
 -export([has_additions/1]).
 -export([has_billable_additions/1]).
+-export([hash/1]).
 
 -include("services.hrl").
 
@@ -617,24 +618,13 @@ calculate_quantity_rate(_Services, Item) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec calculate_discounts(kz_services:services(), item()) -> item().
-calculate_discounts(Services, Item) ->
-    calculate_single_discount(Services, Item).
-
--spec calculate_single_discount(kz_services:services(), item()) -> item().
-calculate_single_discount(_Services, Item) ->
-    DiscountPlan = kzd_item_plan:single_discount(item_plan(Item)),
-    case should_set_discount(Item, DiscountPlan) of
-        'false' -> Item;
-        'true' ->
-            Rate = kz_json:get_float_value(<<"rate">>, DiscountPlan, rate(Item)),
-            set_single_discount_rate(Item, Rate)
-    end.
+calculate_discounts(_Services, Item) ->
+    maybe_set_discounts(Item, item_plan(Item)).
 
 %%------------------------------------------------------------------------------
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
-
 -type discount_routine() :: fun((kzd_item_plan:doc(), item()) ->
                                        item()).
 
@@ -690,7 +680,8 @@ set_cumulative_discount(Item, DiscountPlan) ->
 cumulative_rate(Item, DiscountPlan, BillableQuantity) ->
     Rates = kz_json:get_value(<<"rates">>, DiscountPlan, []),
     case find_tiered_rate(Rates, BillableQuantity) of
-        'undefined' -> rate(Item);
+        'undefined' ->
+            kz_json:get_float_value(<<"rate">>, DiscountPlan, rate(Item));
         Rate -> Rate
     end.
 
@@ -783,3 +774,16 @@ has_billable_additions(Item) ->
             Key = [<<"difference">>, <<"billable">>],
             kz_json:get_integer_value(Key, Changes, 0) > 0
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% @end
+%%------------------------------------------------------------------------------
+-spec hash(item()) -> binary().
+hash(Item) ->
+    kz_binary:md5(
+      <<(category_name(Item))/binary
+       ,(item_name(Item))/binary
+       ,(kz_term:to_binary(is_masquerading(Item)))/binary
+      >>
+     ).

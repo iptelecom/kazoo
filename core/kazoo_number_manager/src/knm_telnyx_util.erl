@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2014-2019, 2600Hz
+%%% @copyright (C) 2014-2020, 2600Hz
 %%% @doc
 %%% @author Pierre Fenoll
 %%% @end
@@ -84,7 +84,7 @@ req('put', ["numbers", "%2B1"++_, "e911_settings"], _) ->
 req('put', ["numbers", "%2B1"++_], Body) ->
     EnableCNAM = <<"enable_caller_id_name">>,
     case kz_json:is_true(EnableCNAM, Body) of
-        false -> rep({ok, 200, [], kz_json:encode(kz_json:from_list([{EnableCNAM, false}]))});
+        false -> rep({'ok', 200, [], kz_json:encode(kz_json:from_list([{EnableCNAM, false}]))});
         true ->
             case kz_json:get_ne_binary_value(<<"cnam_listing_details">>, Body) of
                 undefined -> rep_fixture("telnyx_activate_cnam_inbound.json");

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc
 %%% @author Luis Azedo
 %%% @end
@@ -833,7 +833,7 @@ remonitor_globals() ->
      ).
 
 -spec remonitor_globals('$end_of_table' | {[kz_global:global()], ets:continuation()}) ->
-                               'ok'.
+          'ok'.
 remonitor_globals('$end_of_table') -> 'ok';
 remonitor_globals({[Global], Continuation}) ->
     remonitor_global(Global),
@@ -885,7 +885,7 @@ amqp_call_scope() ->
 -spec amqp_call_scope(integer(), integer()) -> fun() | 'undefined'.
 amqp_call_scope(_N, Seconds)
   when Seconds < ?MILLISECONDS_IN_MINUTE * 2 ->
-    lager:debug("system running for less than 2 minutes, attempting to collect 10 responses from kazoo_globals"),
+    lager:debug("system running for less than 2 minutes, attempting to collect 10 (instead of ~p) responses from kazoo_globals", [_N]),
     amqp_call_scope_fun(10);
 amqp_call_scope(N, _Seconds) ->
     amqp_call_scope_fun(N).
@@ -903,6 +903,7 @@ is_ready() ->
     try
         gen_listener:call(?MODULE, 'is_ready')
     catch
-        _T:_E -> lager:info("globals is_ready returned ~p : ~p", [_T,_E]),
-                 false
+        _T:_E ->
+            lager:info("globals is_ready returned ~p : ~p", [_T,_E]),
+            'false'
     end.

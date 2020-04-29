@@ -1,3 +1,8 @@
+%%%-----------------------------------------------------------------------------
+%%% @copyright (C) 2010-2020, 2600Hz
+%%% @doc Bind for AMQP configuration change events and remove entries from cache
+%%% @end
+%%%-----------------------------------------------------------------------------
 -module(kz_cache_listener).
 -behaviour(gen_listener).
 
@@ -133,6 +138,8 @@ handle_cast({'gen_listener',{'created_queue',_Queue}}, State) ->
     {'noreply', State};
 handle_cast({'gen_listener',{'is_consuming', _IsConsuming}}, State) ->
     {'noreply', State};
+handle_cast({'gen_listener',{'federators_consuming', _AreFederatorsConsuming}}, State) ->
+    {'noreply', State};
 handle_cast(_Msg, State) ->
     lager:debug("unhandled cast: ~p", [_Msg]),
     {'noreply', State}.
@@ -152,14 +159,21 @@ handle_info(_Info, State) ->
 %%------------------------------------------------------------------------------
 -spec handle_event(kz_json:object(), state()) -> 'ignore'.
 handle_event(JObj, #state{name=Name}) ->
-    _ = case (V=kapi_conf:doc_update_v(JObj))
-            andalso (kz_api:node(JObj) =/= kz_term:to_binary(node())
-                     orelse kz_json:get_atom_value(<<"Origin-Cache">>, JObj) =/= ets:info(Name, 'name')
+    IsValid = kapi_conf:doc_update_v(JObj),
+    FromOtherNode = kz_api:node(JObj) =/= kz_term:to_binary(node()),
+    FromOtherCache = kz_json:get_atom_value(<<"Origin-Cache">>, JObj) =/= ets:info(Name, 'name'),
+
+    _ = case IsValid
+            andalso (FromOtherNode
+                     orelse FromOtherCache
                     )
         of
-            'true' -> handle_document_change(JObj, Name);
-            'false' when V -> exec_bindings(Name, JObj);
-            'false' -> lager:error("payload invalid for kapi_conf: ~p", [JObj])
+            'true' ->
+                handle_document_change(JObj, Name);
+            'false' when IsValid ->
+                _P = kz_util:spawn(fun exec_bindings/2, [kz_term:to_binary(Name), JObj]);
+            'false' ->
+                lager:error("payload invalid for kapi_conf: ~p", [JObj])
         end,
     'ignore'.
 
@@ -178,8 +192,8 @@ exec_bindings(Name, JObj) ->
     Id = kz_json:get_ne_binary_value(<<"ID">>, JObj),
     Event = kz_api:event_name(JObj),
     RK = kz_binary:join([<<"kapi.conf">>, Name, Db, Type, Event, Id], <<".">>),
-    kazoo_bindings:pmap(RK, JObj),
-    'ok'.
+    _ = kazoo_bindings:pmap(RK, JObj),
+    lager:debug("executed pmap routing key ~s", [RK]).
 
 -spec handle_document_change(kz_json:object(), atom()) -> 'ok' | 'false'.
 handle_document_change(JObj, Name) ->
@@ -189,14 +203,14 @@ handle_document_change(JObj, Name) ->
     Type = kz_json:get_ne_binary_value(<<"Type">>, JObj),
     Id = kz_json:get_ne_binary_value(<<"ID">>, JObj),
 
-    _ = kz_util:spawn(fun exec_bindings/2, [kz_term:to_binary(Name), JObj]),
+    _P = kz_util:spawn(fun exec_bindings/2, [kz_term:to_binary(Name), JObj]),
 
     _Keys = handle_document_change(Db, Type, Id, Name),
     _Keys =/= []
         andalso lager:debug("removed ~p keys for ~s/~s/~s", [length(_Keys), Db, Id, Type]).
 
 -spec handle_document_change(kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary(), atom()) ->
-                                    list().
+          list().
 handle_document_change(Db, <<"database">>, _Id, Name) ->
     MatchSpec = match_db_changed(Db),
     lists:foldl(fun(Obj, Removed) ->

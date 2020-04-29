@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc stepswitch routing WhApp entry module
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -20,8 +20,8 @@
 start(_StartType, _StartArgs) ->
     _ = declare_exchanges(),
     kapps_maintenance:bind_and_register_views('stepswitch', 'stepswitch_maintenance', 'register_views'),
-    kapps_maintenance:refresh(?KZ_SIP_DB),
-    kapps_maintenance:refresh(?KZ_OFFNET_DB),
+    _ = kapps_maintenance:refresh(?KZ_SIP_DB),
+    _ = kapps_maintenance:refresh(?KZ_OFFNET_DB),
     stepswitch_sup:start_link().
 
 %%------------------------------------------------------------------------------
@@ -41,5 +41,4 @@ declare_exchanges() ->
     _ = kapi_offnet_resource:declare_exchanges(),
     _ = kapi_resource:declare_exchanges(),
     _ = kapi_route:declare_exchanges(),
-    _ = kapi_sms:declare_exchanges(),
     kapi_self:declare_exchanges().

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -68,7 +68,7 @@
 
 %% Server operations
 -spec new_connection(map()) -> kz_data:connection() |
-                               {'error', 'timeout' | 'ehostunreach' | _}.
+          {'error', 'timeout' | 'ehostunreach' | _}.
 new_connection(Map) ->
     kz_couch_util:new_connection(Map).
 
@@ -77,7 +77,7 @@ format_error(Error) ->
     kz_couch_util:format_error(Error).
 
 %% Connection operations
--spec get_db(kz_data:connection(), kz_term:ne_binary()) -> any().
+-spec get_db(server(), kz_term:ne_binary()) -> db().
 get_db(Server, DbName) ->
     kz_couch_util:get_db(Server, DbName).
 
@@ -158,8 +158,8 @@ db_list(Server, Options) ->
 db_list('couchdb_2', Server, Options) ->
     kz_couch_db:db_list(Server, Options);
 db_list('bigcouch', Server, Options) ->
-    {'ok', Results} = kz_couch_view:all_docs(Server, <<"dbs">>, Options),
-    {'ok', [ kz_doc:id(Db) || Db <- Results]};
+    {'ok', List} = kz_couch_db:db_list(Server, Options),
+    {'ok', db_local_filter(List, Options)};
 db_list('couchdb_1_6', Server, Options) ->
     {'ok', List} = kz_couch_db:db_list(Server, Options),
     {'ok', db_local_filter(List, Options)}.
@@ -207,8 +207,8 @@ fetch_attachment(Server, DbName, DocId, AName) ->
     kz_couch_attachments:fetch_attachment(Server, DbName, DocId, AName).
 
 -spec stream_attachment(kz_data:connection(), kz_term:ne_binary(), kz_term:ne_binary(), kz_term:ne_binary(), pid()) ->
-                               {'ok', doc()} |
-                               {'error', any()}.
+          {'ok', doc()} |
+          {'error', any()}.
 stream_attachment(Server, DbName, DocId, AName, Caller) ->
     kz_couch_attachments:stream_attachment(Server, DbName, DocId, AName, Caller).
 
@@ -237,11 +237,15 @@ design_compact(Server, DbName, Design) ->
 all_design_docs(#server{}=Server, ?NE_BINARY = DBName, Options) ->
     kz_couch_view:all_design_docs(Server, DBName, Options).
 
--spec get_results(kz_data:connection(), kz_term:ne_binary(), kz_term:ne_binary(), kz_data:options()) -> any().
+-spec get_results(server(), kz_term:ne_binary(), 'all_docs' | kz_term:ne_binary(), view_options()) ->
+          {'ok', kz_json:objects() | kz_json:path()} |
+          couchbeam_error().
 get_results(Server, DbName, DesignDoc, ViewOptions) ->
     kz_couch_view:get_results(Server, DbName, DesignDoc, ViewOptions).
 
--spec get_results_count(kz_data:connection(), kz_term:ne_binary(), kz_term:ne_binary(), kz_data:options()) -> any().
+-spec get_results_count(server(), 'all_docs' | kz_term:ne_binary(), kz_term:ne_binary(), view_options()) ->
+          {'ok', kz_term:api_integer()} |
+          couchbeam_error().
 get_results_count(Server, DbName, DesignDoc, ViewOptions) ->
     kz_couch_view:get_results_count(Server, DbName, DesignDoc, ViewOptions).
 
@@ -251,7 +255,7 @@ all_docs(Server, DbName, Options) ->
 
 -spec server_version(server()) -> couch_version().
 server_version(#server{options=Options}) ->
-    props:get_value('driver_version', Options).
+    props:get_value('driver_version', Options, 'bigcouch').
 
 -spec db_local_filter(kz_term:ne_binaries(), kz_data:options()) -> kz_term:ne_binaries().
 db_local_filter(List, Options) ->

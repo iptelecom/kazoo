@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -19,6 +19,7 @@
 -export([do_not_disturb/1, do_not_disturb/2, set_do_not_disturb/2]).
 -export([do_not_disturb_enabled/1, do_not_disturb_enabled/2, set_do_not_disturb_enabled/2]).
 -export([enabled/1, enabled/2, set_enabled/2]).
+-export([flags/1, flags/2, set_flags/2]).
 -export([formatters/1, formatters/2, set_formatters/2]).
 -export([language/1, language/2, set_language/2]).
 -export([metaflows/1, metaflows/2, set_metaflows/2]).
@@ -63,7 +64,7 @@
         ,path_enabled/0
         ,is_expired/1
 
-        ,tree/1, tree/2, set_tree/2
+        ,tree/1, tree/2, set_tree/2, path_tree/0
         ,default_timezone/0
         ,notification_preference/1, set_notification_preference/2, path_notification_preference/0
         ,allow_number_additions/1, set_allow_number_additions/2, path_allow_number_additions/0
@@ -268,11 +269,24 @@ enabled(Doc) ->
 
 -spec enabled(doc(), Default) -> boolean() | Default.
 enabled(Doc, Default) ->
-    kz_json:get_boolean_value([<<"enabled">>], Doc, Default).
+    kz_json:get_boolean_value([<<"enabled">>], Doc, Default)
+        andalso kz_json:get_boolean_value([<<"pvt_enabled">>], Doc, Default).
 
 -spec set_enabled(doc(), boolean()) -> doc().
 set_enabled(Doc, Enabled) ->
     kz_json:set_value([<<"enabled">>], Enabled, Doc).
+
+-spec flags(doc()) -> kz_term:api_ne_binaries().
+flags(Doc) ->
+    flags(Doc, 'undefined').
+
+-spec flags(doc(), Default) -> kz_term:ne_binaries() | Default.
+flags(Doc, Default) ->
+    kz_json:get_list_value([<<"flags">>], Doc, Default).
+
+-spec set_flags(doc(), kz_term:ne_binaries()) -> doc().
+set_flags(Doc, Flags) ->
+    kz_json:set_value([<<"flags">>], Flags, Doc).
 
 -spec formatters(doc()) -> kz_term:api_object().
 formatters(Doc) ->
@@ -703,16 +717,16 @@ set_zones_home(Doc, ZonesHome) ->
 type() -> <<"account">>.
 
 -spec fetch(kz_term:api_ne_binary()) ->
-                   {'ok', doc()} |
-                   kz_datamgr:data_error().
+          {'ok', doc()} |
+          kz_datamgr:data_error().
 fetch('undefined') ->
     {'error', 'invalid_db_name'};
 fetch(Account=?NE_BINARY) ->
     fetch(Account, 'account').
 
 -spec fetch(kz_term:api_ne_binary(), 'account' | 'accounts') ->
-                   {'ok', doc()} |
-                   kz_datamgr:data_error().
+          {'ok', doc()} |
+          kz_datamgr:data_error().
 fetch('undefined', _) ->
     {'error', 'invalid_db_name'};
 fetch(Account, 'account') ->
@@ -723,11 +737,11 @@ fetch(AccountId, 'accounts') ->
     open_cache_doc(?KZ_ACCOUNTS_DB, AccountId).
 
 -spec open_cache_doc(kz_term:ne_binary(), kz_term:ne_binary()) ->
-                            {'ok', doc()} |
-                            kz_datamgr:data_error().
+          {'ok', doc()} |
+          kz_datamgr:data_error().
 open_cache_doc(Db, AccountId) ->
-    Options = [{'cache_failures','false'}
-              ,{'deleted','true'}
+    Options = [{'cache_failures', 'false'}
+              ,{'deleted', 'true'}
               ],
     kz_datamgr:open_cache_doc(Db, AccountId, Options).
 
@@ -740,7 +754,7 @@ fetch_realm(Account) ->
     fetch_value(Account, fun realm/1).
 
 -spec fetch_value(kz_term:api_ne_binary(), fun((doc()) -> kz_json:json_term())) ->
-                         kz_json:api_json_term().
+          kz_json:api_json_term().
 fetch_value('undefined', _Getter) -> 'undefined';
 fetch_value(Account, Getter) ->
     case fetch(Account) of
@@ -766,7 +780,7 @@ is_enabled(?NE_BINARY = Id) ->
         {'error', _} -> 'false'
     end;
 is_enabled(JObj) ->
-    kz_json:is_true([<<"pvt_enabled">>], JObj, 'true').
+    enabled(JObj, 'true').
 
 -spec enable(doc()) -> doc().
 enable(JObj) ->
@@ -787,6 +801,10 @@ tree(JObj) ->
 -spec tree(doc(), Default) -> kz_term:ne_binaries() | Default.
 tree(JObj, Default) ->
     kz_json:get_list_value([<<"pvt_tree">>], JObj, Default).
+
+-spec path_tree() -> kz_json:path().
+path_tree() ->
+    [<<"pvt_tree">>].
 
 -spec set_tree(doc(), kz_term:ne_binaries()) -> doc().
 set_tree(JObj, Tree) ->
@@ -923,9 +941,12 @@ demote(JObj) ->
 path_reseller() ->
     [<<"pvt_reseller">>].
 
--spec reseller_id(doc()) -> doc().
-reseller_id(JObj) ->
-    kz_json:get_value([<<"pvt_reseller_id">>], JObj).
+-spec reseller_id(kz_term:ne_binary() | doc()) -> doc().
+reseller_id(<<AccountId/binary>>) ->
+    {'ok', AccountDoc} = fetch(AccountId),
+    reseller_id(AccountDoc);
+reseller_id(AccountDoc) ->
+    kz_json:get_value([<<"pvt_reseller_id">>], AccountDoc).
 
 -spec set_reseller_id(doc(), kz_term:ne_binary()) -> doc().
 set_reseller_id(JObj, ResellerId) ->
@@ -1013,7 +1034,7 @@ get_authoritative_parent_id(AccountId) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_authoritative_parent_id(kz_term:api_ne_binary(), {'ok', kz_term:ne_binary()} | {'error', any()} | kz_term:ne_binary()) ->
-                                         kz_term:api_ne_binary().
+          kz_term:api_ne_binary().
 get_authoritative_parent_id(AccountId, {'ok', MasterAccountId}) ->
     get_authoritative_parent_id(AccountId, MasterAccountId);
 get_authoritative_parent_id(_AccountId, {'error', _}) ->
@@ -1191,8 +1212,8 @@ path_initial_call_sent() ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec save(doc()) ->
-                  {'ok', doc()} |
-                  kz_datamgr:data_error().
+          {'ok', doc()} |
+          kz_datamgr:data_error().
 save(AccountJObj) ->
     AccountDb = kz_doc:account_db(AccountJObj),
     case kz_datamgr:save_doc(AccountDb, AccountJObj) of
@@ -1203,8 +1224,8 @@ save(AccountJObj) ->
     end.
 
 -spec save_accounts_doc(doc()) ->
-                               {'ok', doc()} |
-                               kz_datamgr:data_error().
+          {'ok', doc()} |
+          kz_datamgr:data_error().
 save_accounts_doc(AccountDoc) ->
     case kz_datamgr:open_doc(?KZ_ACCOUNTS_DB, kz_doc:id(AccountDoc)) of
         {'error', 'not_found'} ->
@@ -1213,26 +1234,27 @@ save_accounts_doc(AccountDoc) ->
             lager:info("failed to save account doc to accounts: ~p", [_R]),
             E;
         {'ok', AccountsDoc} ->
-            Update = [{kz_doc:path_revision(), kz_doc:revision(AccountsDoc)}
-                      | kz_json:to_proplist(AccountDoc)
-                     ],
-            UpdateOptions = [{'update', Update}
-                            ,{'ensure_saved', 'true'}
-                            ],
+            NewAccountDoc = kz_json:set_value(kz_doc:path_revision()
+                                             ,kz_doc:revision(AccountsDoc)
+                                             ,AccountDoc
+                                             ),
             handle_saved_accounts_doc(AccountDoc
-                                     ,kz_datamgr:update_doc(?KZ_ACCOUNTS_DB, kz_doc:id(AccountDoc), UpdateOptions)
+                                     ,kz_datamgr:save_doc(?KZ_ACCOUNTS_DB, NewAccountDoc)
                                      )
     end.
 
 -spec handle_saved_accounts_doc(doc(), kz_datamgr:data_error() | {'ok', doc()}) ->
-                                       kz_datamgr:data_error() | {'ok', doc()}.
+          kz_datamgr:data_error() | {'ok', doc()}.
 handle_saved_accounts_doc(AccountDoc, {'ok', _}) ->
+    lager:debug("saved account ~s(~s)", [kz_doc:id(AccountDoc), kz_doc:revision(AccountDoc)]),
     {'ok', AccountDoc};
-handle_saved_accounts_doc(_, Error) -> Error.
+handle_saved_accounts_doc(_AccountDoc, Error) ->
+    lager:debug("failed to save 'accounts' doc ~s: ~p", [kz_doc:id(_AccountDoc), Error]),
+    Error.
 
 -spec update(kz_term:ne_binary(), kz_json:flat_proplist()) ->
-                    {'ok', doc()} |
-                    kz_datamgr:data_error().
+          {'ok', doc()} |
+          kz_datamgr:data_error().
 update(?NE_BINARY = Account, UpdateProps) ->
     AccountId = kz_util:format_account_id(Account, 'raw'),
     AccountDb = kz_util:format_account_db(AccountId),
@@ -1243,8 +1265,10 @@ update(?NE_BINARY = Account, UpdateProps) ->
 
     case kz_datamgr:update_doc(AccountDb, AccountId, UpdateOptions) of
         {'error', _}=E -> E;
-        {'ok', _} ->
-            kz_datamgr:update_doc(?KZ_ACCOUNTS_DB, AccountId, UpdateOptions)
+        {'ok', AccountDoc} ->
+            handle_saved_accounts_doc(AccountDoc
+                                     ,kz_datamgr:update_doc(?KZ_ACCOUNTS_DB, AccountId, UpdateOptions)
+                                     )
     end.
 
 %% @equiv is_in_account_hierarchy(CheckFor, InAccount, false)

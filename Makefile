@@ -7,7 +7,7 @@ ERLANG_MK_COMMIT = d30dda39b08e6ed9e12b44533889eaf90aba86de
 
 BASE_BRANCH := $(shell cat $(ROOT)/.base_branch)
 
-CHANGED := $(shell git --no-pager diff --name-only HEAD $(BASE_BRANCH) -- applications core scripts)
+CHANGED ?= $(shell git --no-pager diff --name-only HEAD $(BASE_BRANCH) -- applications core scripts)
 CHANGED_SWAGGER := $(shell git --no-pager diff --name-only HEAD $(BASE_BRANCH) -- applications/crossbar/priv/api/swagger.json)
 
 # You can override this when calling make, e.g. make JOBS=1
@@ -39,6 +39,9 @@ changed_swagger:
 
 compile: ACTION = all
 compile: deps kazoo
+
+compile-lean: ACTION = compile-lean
+compile-lean: deps $(KAZOODIRS)
 
 $(KAZOODIRS):
 	@$(MAKE) -C $(@D) $(ACTION)
@@ -178,7 +181,7 @@ dialyze-core: dialyze-it
 dialyze:       TO_DIALYZE ?= $(shell find $(ROOT)/applications -name ebin)
 dialyze: dialyze-it
 
-dialyze-changed: TO_DIALYZE = $(CHANGED)
+dialyze-changed: TO_DIALYZE = $(strip $(filter %.beam %.erl %/ebin,$(CHANGED)))
 dialyze-changed: dialyze-it-changed
 
 dialyze-hard: TO_DIALYZE = $(CHANGED)
@@ -191,11 +194,15 @@ dialyze-it-hard: $(PLT)
 	@ERL_LIBS=deps:core:applications $(if $(DEBUG),time -v) $(ROOT)/scripts/check-dialyzer.escript $(ROOT)/.kazoo.plt --hard $(filter %.beam %.erl %/ebin,$(TO_DIALYZE))
 
 dialyze-it-changed: $(PLT)
-ifeq ($(strip $(filter %.beam %.erl %/ebin,$(TO_DIALYZE))),)
-	@echo "no erlang changes to dialyze"
-else
-	@ERL_LIBS=deps:core:applications $(if $(DEBUG),time -v) $(ROOT)/scripts/check-dialyzer.escript $(ROOT)/.kazoo.plt --bulk $(filter %.beam %.erl %/ebin,$(TO_DIALYZE))
-endif
+	@if [ -n "$(TO_DIALYZE)" ]; then \
+		echo "dialyzing changes against $(BASE_BRANCH) ..." ; \
+		echo; \
+		echo "$(TO_DIALYZE)" ;\
+		echo; \
+		ERL_LIBS=deps:core:applications $(if $(DEBUG),time -v) $(ROOT)/scripts/check-dialyzer.escript $(ROOT)/.kazoo.plt --bulk $(TO_DIALYZE) && echo "dialyzer is happy!"; \
+	else \
+		echo "no erlang changes to dialyze"; \
+	fi
 
 xref: TO_XREF ?= $(shell find $(ROOT)/applications $(ROOT)/core $(ROOT)/deps -name ebin)
 xref:
@@ -226,7 +233,7 @@ diff: dialyze-it
 bump-copyright:
 	@$(ROOT)/scripts/bump-copyright-year.sh $(shell find applications core -iname '*.erl' -or -iname '*.hrl')
 
-FMT_SHA = 237604a566879bda46d55d9e74e3e66daf1b557a
+FMT_SHA = 4e9b3379952e0cb3319308d7bdef832eb305f816
 $(FMT):
 	wget -qO - 'https://codeload.github.com/fenollp/erlang-formatter/tar.gz/$(FMT_SHA)' | tar -vxz -C $(ROOT)/make/
 	mv $(ROOT)/make/erlang-formatter-$(FMT_SHA) $(ROOT)/make/erlang-formatter
@@ -245,23 +252,24 @@ app_applications:
 	ERL_LIBS=deps:core:applications $(ROOT)/scripts/apps_of_app.escript -a $(shell find applications -name *.app.src)
 
 code_checks:
-	@ERL_LIBS=deps/:core/:applications/ $(ROOT)/scripts/no_raw_json.escript
+	@if [ -n "$(CHANGED)" ]; then $(ROOT)/scripts/code_checks.bash $(CHANGED) ; else echo "no code changes for code checking" ; fi
+	@ERL_LIBS=deps:core:applications $(ROOT)/scripts/no_raw_json.escript $(CHANGED)
 	@$(ROOT)/scripts/check-spelling.bash
 	@$(ROOT)/scripts/kz_diaspora.bash
 	@$(ROOT)/scripts/edocify.escript
 
-apis:
-	@ERL_LIBS=deps/:core/:applications/ $(ROOT)/scripts/generate-schemas.escript
-	@$(ROOT)/scripts/format-json.sh $(shell find applications core -wholename '*/schemas/*.json')
-	@ERL_LIBS=deps/:core/:applications/ $(ROOT)/scripts/generate-api-endpoints.escript
+apis: schemas
+	@ERL_LIBS=deps:core:applications $(ROOT)/scripts/generate-api-endpoints.escript
 	@$(ROOT)/scripts/generate-doc-schemas.sh `egrep -rl '(#+) Schema' core/ applications/ | grep -v '.[h|e]rl'`
 	@$(ROOT)/scripts/format-json.sh applications/crossbar/priv/api/swagger.json
 	@$(ROOT)/scripts/format-json.sh $(shell find applications core -wholename '*/api/*.json')
-	@ERL_LIBS=deps/:core/:applications/ $(ROOT)/scripts/generate-fs-headers-hrl.escript
-	@ERL_LIBS=deps/:core/:applications/ $(ROOT)/scripts/generate-kzd-builders.escript
+	@ERL_LIBS=deps:core:applications $(ROOT)/scripts/generate-fs-headers-hrl.escript
+	@ERL_LIBS=deps:core:applications $(ROOT)/scripts/generate-kzd-builders.escript
 
+.PHONY: schemas
 schemas:
-	@ERL_LIBS=deps/:core/:applications/ $(ROOT)/scripts/generate-schemas.escript
+	@ERL_LIBS=deps:core:applications $(ROOT)/scripts/generate-schemas.escript $(CHANGED)
+	@$(ROOT)/scripts/format-json.sh $(shell find applications core -wholename '*/schemas/*.json')
 
 DOCS_ROOT=$(ROOT)/doc/mkdocs
 docs: docs-validate docs-report docs-setup docs-build
@@ -288,7 +296,7 @@ docs-serve: docs-setup docs-build
 	@$(MAKE) -C $(DOCS_ROOT) DOCS_ROOT=$(DOCS_ROOT) docs-serve
 
 fs-headers:
-	@ERL_LIBS=deps/:core/:applications/ $(ROOT)/scripts/generate-fs-headers-hrl.escript
+	@ERL_LIBS=deps:core:applications $(ROOT)/scripts/generate-fs-headers-hrl.escript
 
 validate-swagger:
 	@$(ROOT)/scripts/validate-swagger.sh

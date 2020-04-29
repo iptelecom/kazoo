@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2019, 2600Hz
+%%% @copyright (C) 2013-2020, 2600Hz
 %%% @doc
 %%% @author Pierre Fenoll
 %%% @end
@@ -16,6 +16,9 @@
 
         ,compact_db/1
         ,compact_node/1
+
+         %% Used to handle auto_compaction triggers. Check init/0 for more info.
+        ,do_compact_db/1
         ]).
 
 %% Triggerables
@@ -62,16 +65,18 @@
 init() ->
     AdminNodes = kazoo_couch:get_admin_nodes(),
     %% Refresh `nodes | _nodes' db
-    kapps_maintenance:refresh(AdminNodes),
+    _ = kapps_maintenance:refresh(AdminNodes),
     %% Refresh `dbs | _dbs' db needed for the compactor/listing_by_node view.
-    kapps_maintenance:refresh(kazoo_couch:get_admin_dbs()),
+    _ = kapps_maintenance:refresh(kazoo_couch:get_admin_dbs()),
     set_node_defaults(AdminNodes),
 
     _ = case ?COMPACT_AUTOMATICALLY of
             'false' -> lager:info("node ~s not configured to compact automatically", [node()]);
             'true' ->
                 lager:info("node ~s configured to compact automatically", [node()]),
-                %% By default, `do_compact_db/1' sets `?HEUR_RATIO' as the Heuristic to use.
+                %% Need to use `do_compact_db/1' instead of `compact_db/1' because the
+                %% the former uses `?HEUR_RATIO' for heuristic and the latter ignores
+                %% heuristic and doesn't allow to improve auto compaction job exec time.
                 _ = tasks_bindings:bind(?TRIGGER_ALL_DBS, ?MODULE, 'do_compact_db')
         end,
 
@@ -270,7 +275,7 @@ maybe_track_compact_node(Node, Heur, _CallId) ->
     do_compact_node(Node, Heur).
 
 -spec do_compact_node(kz_term:ne_binary(), heuristic()) ->
-                             rows().
+          rows().
 do_compact_node(Node, Heuristic) ->
     #{server := {_App, #server{}=Conn}} = kzs_plan:plan(),
 
@@ -283,7 +288,7 @@ do_compact_node(Node, Heuristic) ->
     end.
 
 -spec do_compact_node(kz_term:ne_binary(), heuristic(), kz_data:connection(), kz_data:connection()) ->
-                             rows().
+          rows().
 do_compact_node(Node, Heuristic, APIConn, AdminConn) ->
     case kz_datamgr:get_results(kazoo_couch:get_admin_dbs(APIConn)
                                ,<<"compactor/listing_by_node">>
@@ -399,13 +404,13 @@ db_usage_cols(Conn, Database) ->
     end.
 
 -spec node_compactor(kz_term:ne_binary(), heuristic(), kz_data:connection(), kz_data:connection(), kz_term:ne_binary()) ->
-                            kt_compactor_worker:compactor().
+          kt_compactor_worker:compactor().
 node_compactor(Node, Heuristic, APIConn, AdminConn, Database) ->
     kt_compactor_worker:new(Node, Heuristic, APIConn, AdminConn, Database).
 
 -spec get_node_connections(kz_term:ne_binary(), kz_data:connection()) ->
-                                  {kz_data:connection(), kz_data:connection()} |
-                                  {'error', 'no_connection'}.
+          {kz_data:connection(), kz_data:connection()} |
+          {'error', 'no_connection'}.
 get_node_connections(Node, #server{options=Options}) ->
     [_, Host] = binary:split(Node, <<"@">>),
     Hostname = kz_term:to_list(Host),

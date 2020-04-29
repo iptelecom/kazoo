@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc Crossbar REST-related functions.
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -28,7 +28,14 @@
         ,finish_request/2
         ,create_push_response/2, create_push_response/3
         ,set_resp_headers/2
-        ,create_resp_content/2, create_resp_file/2, create_csv_resp_content/2
+
+         %% Content
+        ,create_resp_content/2
+        ,create_resp_file/2
+        ,create_csv_resp_content/2
+        ,create_binary_resp_content/2
+        ,create_xml_resp_content/2
+
         ,create_pull_response/2, create_pull_response/3
 
         ,init_chunk_stream/3
@@ -72,12 +79,10 @@
 -define(DEFAULT_CSV_FILE_NAME, <<"result.csv">>).
 
 -type stop_return() :: {'stop', cowboy_req:req(), cb_context:context()}.
--type resp_file() :: {integer(), send_file_fun()}.
+-type resp_file() :: {'file', kz_term:ne_binary()}.
 -type resp_content_return() :: {kz_term:ne_binary() | iolist() | resp_file(), cowboy_req:req()}.
 -type resp_content_fun() :: fun((cowboy_req:req(), cb_context:context()) ->  resp_content_return()).
--type send_file_fun() :: fun((any(), module()) -> 'ok').
--type pull_file_resp() :: {'stream', integer(), send_file_fun()}.
--type pull_file_response_return() :: {pull_file_resp(), cowboy_req:req(), cb_context:context()} |
+-type pull_file_response_return() :: {resp_file(), cowboy_req:req(), cb_context:context()} |
                                      stop_return().
 
 -export_type([pull_file_response_return/0
@@ -113,7 +118,7 @@ is_cors_request(Req, [ReqHdr|ReqHdrs]) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec add_cors_headers(cowboy_req:req(), cb_context:context()) ->
-                              cowboy_req:req().
+          cowboy_req:req().
 add_cors_headers(Req, Context) ->
     ReqMethod = cowboy_req:header(<<"access-control-request-method">>, Req),
 
@@ -142,25 +147,25 @@ get_cors_headers(Allow) ->
     ].
 
 -spec get_req_data(cb_context:context(), cowboy_req:req()) ->
-                          {cb_context:context(), cowboy_req:req()} |
-                          stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 get_req_data(Context, Req0) ->
     {QS, Req1} = get_query_string_data(Req0),
     get_req_data(Context, Req1, get_content_type(Req1), QS).
 
 -spec get_query_string_data(cowboy_req:req()) ->
-                                   {kz_json:object(), cowboy_req:req()}.
+          {kz_json:object(), cowboy_req:req()}.
 get_query_string_data(Req) ->
     QS = cowboy_req:parse_qs(Req),
     get_query_string_data(QS, Req).
 
 -spec get_query_string_data(kz_term:proplist(), cowboy_req:req()) ->
-                                   {kz_json:object(), cowboy_req:req()}.
+          {kz_json:object(), cowboy_req:req()}.
 get_query_string_data([], Req) ->
     {kz_json:new(), Req};
 get_query_string_data(QS0, Req) ->
     QS = kz_json:from_list(QS0),
-    lager:debug("query string: ~p", [kz_json:encode(QS)]),
+    lager:debug("query string: ~s", [kz_json:encode(QS, ['pretty'])]),
     {QS, Req}.
 
 -spec get_content_type(cowboy_req:req()) -> kz_term:api_ne_binary().
@@ -172,8 +177,8 @@ get_content_type(Req) ->
     end.
 
 -spec get_req_data(cb_context:context(), cowboy_req:req(), content_type(), kz_json:object()) ->
-                          {cb_context:context(), cowboy_req:req()} |
-                          stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 get_req_data(Context, Req0, 'undefined', QS) ->
     lager:debug("undefined content type when getting req data, assuming application/json"),
     case get_request_body(Req0) of
@@ -222,8 +227,8 @@ get_req_data(Context, Req1, ContentType, QS) ->
     extract_file(cb_context:set_query_string(Context, QS), ContentType, Req1).
 
 -spec maybe_extract_multipart(cb_context:context(), cowboy_req:req(), kz_json:object()) ->
-                                     {cb_context:context(), cowboy_req:req()} |
-                                     stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 maybe_extract_multipart(Context, Req0, QS) ->
     try extract_multipart(Context, Req0, QS)
     catch
@@ -235,8 +240,8 @@ maybe_extract_multipart(Context, Req0, QS) ->
     end.
 
 -spec handle_failed_multipart(cb_context:context(), cowboy_req:req(), kz_json:object()) ->
-                                     {cb_context:context(), cowboy_req:req()} |
-                                     stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 handle_failed_multipart(Context, Req0, QS) ->
     case get_request_body(Req0) of
         {'ok', ReqBody, Req1} ->
@@ -251,8 +256,8 @@ handle_failed_multipart(Context, Req0, QS) ->
     end.
 
 -spec handle_url_encoded_body(cb_context:context(), cowboy_req:req(), kz_json:object(), binary(), kz_json:object()) ->
-                                     {cb_context:context(), cowboy_req:req()} |
-                                     stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 handle_url_encoded_body(Context, Req, QS, ReqBody, JObj) ->
     case kz_json:get_values(JObj) of
         {['true'], [_JSON]} ->
@@ -265,8 +270,8 @@ handle_url_encoded_body(Context, Req, QS, ReqBody, JObj) ->
     end.
 
 -spec set_request_data_in_context(cb_context:context(), cowboy_req:req(), kz_term:api_object(), kz_json:object()) ->
-                                         {cb_context:context(), cowboy_req:req()} |
-                                         stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 set_request_data_in_context(Context, Req, 'undefined', QS) ->
     lager:debug("request json is empty"),
     {set_valid_data_in_context(Context, kz_json:new(), QS), Req};
@@ -285,7 +290,7 @@ set_request_data_in_context(Context, Req, JObj, QS) ->
     end.
 
 -spec set_valid_data_in_context(cb_context:context(), kz_json:object(), kz_json:object()) ->
-                                       cb_context:context().
+          cb_context:context().
 set_valid_data_in_context(Context, JObj, QS) ->
     Setters = [{fun cb_context:set_req_json/2, JObj}
               ,{fun cb_context:set_req_data/2, kz_json:get_value(<<"data">>, JObj, kz_json:new())}
@@ -294,8 +299,8 @@ set_valid_data_in_context(Context, JObj, QS) ->
     cb_context:setters(Context, Setters).
 
 -spec try_json(kz_term:ne_binary(), kz_json:object(), cb_context:context(), cowboy_req:req()) ->
-                      {cb_context:context(), cowboy_req:req()} |
-                      stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 try_json(ReqBody, QS, Context, Req) ->
     try get_json_body(ReqBody, Req) of
         {{'malformed', Msg}, Req1} ->
@@ -309,7 +314,7 @@ try_json(ReqBody, QS, Context, Req) ->
     end.
 
 -spec stop_on_invalid_envelope(kz_term:ne_binary(), cowboy_req:req(), cb_context:context()) ->
-                                      stop_return().
+          stop_return().
 stop_on_invalid_envelope(Msg, Req, Context) ->
     ?MODULE:stop(Req
                 ,cb_context:add_validation_error(<<"json">>
@@ -324,7 +329,7 @@ stop_on_invalid_envelope(Msg, Req, Context) ->
                 ).
 
 -spec stop_on_invalid_envelope(cowboy_req:req(), cb_context:context()) ->
-                                      stop_return().
+          stop_return().
 stop_on_invalid_envelope(Req, Context) ->
     stop_on_invalid_envelope(?DEFAULT_JSON_ERROR_MSG, Req, Context).
 
@@ -337,8 +342,8 @@ get_url_encoded_body(ReqBody) ->
                                      cowboy_req:req().
 
 -spec extract_multipart(cb_context:context(), cowboy_multipart_response(), kz_json:object()) ->
-                               {cb_context:context(), cowboy_req:req()} |
-                               stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 extract_multipart(Context, {'done', Req}, _QS) ->
     {cb_context:store(Context, <<"multipart_headers">>, 'undefined'), Req};
 extract_multipart(Context0, {'ok', Headers, Req0}, QS) ->
@@ -357,8 +362,8 @@ extract_multipart(Context, Req, QS) ->
                      ).
 
 -spec extract_file(cb_context:context(), kz_term:ne_binary(), cowboy_req:req()) ->
-                          {cb_context:context(), cowboy_req:req()} |
-                          stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 extract_file(Context, ContentType, Req0) ->
     case get_request_body(Req0) of
         {'ok', FileContents, Req1} ->
@@ -368,8 +373,8 @@ extract_file(Context, ContentType, Req0) ->
     end.
 
 -spec handle_file_contents(cb_context:context(), kz_term:ne_binary(), cowboy_req:req(), binary()) ->
-                                  {cb_context:context(), cowboy_req:req()} |
-                                  stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 handle_file_contents(Context, ContentType, Req, FileContents) ->
 
     MultiPartHeaders = cb_context:fetch(Context, <<"multipart_headers">>, #{}),
@@ -409,8 +414,8 @@ default_filename() ->
     <<"uploaded_file_", (kz_term:to_binary(kz_time:now_s()))/binary>>.
 
 -spec decode_base64(cb_context:context(), kz_term:ne_binary(), cowboy_req:req()) ->
-                           {cb_context:context(), cowboy_req:req()} |
-                           stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 decode_base64(Context, CT, Req0) ->
     case get_request_body(Req0) of
         {'ok', Base64Data, Req1} ->
@@ -420,8 +425,8 @@ decode_base64(Context, CT, Req0) ->
     end.
 
 -spec decode_base64(cb_context:context(), kz_term:ne_binary(), cowboy_req:req(), binary()) ->
-                           {cb_context:context(), cowboy_req:req()} |
-                           stop_return().
+          {cb_context:context(), cowboy_req:req()} |
+          stop_return().
 decode_base64(Context, CT, Req, Base64Data) ->
     try kz_attachment:decode_base64(Base64Data) of
         {EncodedType, FileContents} ->
@@ -454,8 +459,8 @@ decode_base64(Context, CT, Req, Base64Data) ->
     end.
 
 -spec get_request_body(cowboy_req:req()) ->
-                              {'ok', binary(), cowboy_req:req()} |
-                              {'error', 'max_size', cowboy_req:req()}.
+          {'ok', binary(), cowboy_req:req()} |
+          {'error', 'max_size', cowboy_req:req()}.
 get_request_body(Req) ->
     ReadLength = ?READ_BODY_LENGTH,
     MaxSize = ?MAX_UPLOAD_SIZE,
@@ -474,16 +479,16 @@ get_request_body(Req) ->
                        {'ok', binary(), cowboy_req:req()}.
 
 -spec get_request_body(cowboy_req:req(), map()) ->
-                              {'ok', binary(), cowboy_req:req()} |
-                              {'error', 'max_size', cowboy_req:req()}.
+          {'ok', binary(), cowboy_req:req()} |
+          {'error', 'max_size', cowboy_req:req()}.
 get_request_body(Req, #{read_fun := ReadFun
                        ,read_options := Opts
                        }=Params) ->
     get_request_body(Params, <<>>, ReadFun(Req, Opts)).
 
 -spec get_request_body(map(), binary(), body_return()) ->
-                              {'ok', binary(), cowboy_req:req()} |
-                              {'error', 'max_size', cowboy_req:req()}.
+          {'ok', binary(), cowboy_req:req()} |
+          {'error', 'max_size', cowboy_req:req()}.
 get_request_body(_, <<>>, {'ok', <<>>, Req1}) ->
     lager:debug("request body had no payload"),
     {'ok', <<>>, Req1};
@@ -492,9 +497,10 @@ get_request_body(#{max_size := MaxSize}, Body, {'more', Data, Req1})
     {'error', 'max_size', Req1};
 get_request_body(#{read_fun := ReadFun, read_options := Opts}=Params, Body, {'more', Data, Req1}) ->
     get_request_body(Params, iolist_to_binary([Body, Data]), ReadFun(Req1, Opts));
-get_request_body(_, Body, {'ok', Data, Req1}) ->
+get_request_body(_, Acc, {'ok', Data, Req1}) ->
+    Body = iolist_to_binary([Acc, Data]),
     lager:debug("received request body payload (size: ~b bytes)", [size(Body)]),
-    {'ok', iolist_to_binary([Body, Data]), Req1}.
+    {'ok', Body, Req1}.
 
 -type get_json_return() :: {kz_term:api_object(), cowboy_req:req()} |
                            {{'malformed', kz_term:ne_binary()}, cowboy_req:req()}.
@@ -597,14 +603,14 @@ path_tokens(Context) ->
 -type cb_mods_with_tokens() :: [cb_mod_with_tokens()].
 
 -spec parse_path_tokens(cb_context:context(), path_tokens()) ->
-                               cb_mods_with_tokens() |
-                               {'stop', cb_context:context()}.
+          cb_mods_with_tokens() |
+          {'stop', cb_context:context()}.
 parse_path_tokens(Context, Tokens) ->
     parse_path_tokens(Context, Tokens, []).
 
 -spec parse_path_tokens(cb_context:context(), kz_json:path(), cb_mods_with_tokens()) ->
-                               cb_mods_with_tokens() |
-                               {'stop', cb_context:context()}.
+          cb_mods_with_tokens() |
+          {'stop', cb_context:context()}.
 parse_path_tokens(_Context, [], Events) -> Events;
 parse_path_tokens(_Context, [<<>>], Events) -> Events;
 parse_path_tokens(_Context, [<<"schemas">>=Mod|T], Events) ->
@@ -646,6 +652,14 @@ is_cb_module(Context, Elem) ->
 
 -spec is_cb_module(kz_term:ne_binaries()) -> boolean().
 is_cb_module([]) -> 'false';
+is_cb_module([<<"cb_device">> | Modules]) ->
+    is_cb_module(Modules);
+is_cb_module([<<"cb_limits">> | Modules]) ->
+    is_cb_module(Modules);
+is_cb_module([<<"cb_phone_numbers">> | Modules]) ->
+    is_cb_module(Modules);
+is_cb_module([<<"cb_users">> | Modules]) ->
+    is_cb_module(Modules);
 is_cb_module([Module|Modules]) ->
     'true' =:= kz_module:is_exported(Module, 'init', 0)
         orelse is_cb_module(Modules).
@@ -707,8 +721,8 @@ maybe_add_post_method(_, _, Allowed) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec is_early_authentic(cowboy_req:req(), cb_context:context()) ->
-                                {'true', cowboy_req:req(), cb_context:context()} |
-                                stop_return().
+          {'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 is_early_authentic(Req, Context) ->
     Event = create_event_name(Context, <<"early_authenticate">>),
     case crossbar_bindings:succeeded(crossbar_bindings:pmap(Event, Context)) of
@@ -725,14 +739,14 @@ is_early_authentic(Req, Context) ->
     end.
 
 -spec is_authentic(cowboy_req:req(), cb_context:context()) ->
-                          {{'false', <<>>} | 'true', cowboy_req:req(), cb_context:context()} |
-                          stop_return().
+          {{'false', <<>>} | 'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 is_authentic(Req, Context) ->
     is_authentic(Req, Context, cb_context:req_verb(Context)).
 
 -spec is_authentic(cowboy_req:req(), cb_context:context(), http_method()) ->
-                          {boolean(), cowboy_req:req(), cb_context:context()} |
-                          stop_return().
+          {boolean(), cowboy_req:req(), cb_context:context()} |
+          stop_return().
 is_authentic(Req, Context, ?HTTP_OPTIONS) ->
     %% all OPTIONS, they are harmless (I hope) and required for CORS preflight
     {'true', Req, Context};
@@ -751,8 +765,8 @@ is_authentic(Req, Context0, _ReqVerb) ->
     end.
 
 -spec is_authentic(cowboy_req:req(), cb_context:context(), http_method(), list()) ->
-                          {{'false', <<>>} | 'true', cowboy_req:req(), cb_context:context()} |
-                          stop_return().
+          {{'false', <<>>} | 'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 
 is_authentic(Req, Context, _ReqVerb, []) ->
     lager:debug("failed to authenticate"),
@@ -774,8 +788,8 @@ is_authentic(Req, Context, _ReqVerb, [{Mod, Params} | _ReqNouns]) ->
     end.
 
 -spec prefer_new_context(kz_term:proplist(), cowboy_req:req(), cb_context:context()) ->
-                                {'true', cowboy_req:req(), cb_context:context()} |
-                                stop_return().
+          {'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 prefer_new_context(Results, Req, Context) ->
     prefer_new_context(Results, Req, Context, 'undefined').
 
@@ -831,14 +845,14 @@ get_authorization_token(Req, Context) ->
     end.
 
 -spec set_auth_context(cb_context:context(), kz_term:ne_binary() | {kz_term:ne_binary(), atom()}) ->
-                              cb_context:context().
+          cb_context:context().
 set_auth_context(Context, {Token, TokenType}) ->
     set_auth_context(Context, Token, TokenType);
 set_auth_context(Context, Authorization) ->
     set_auth_context(Context, get_authorization_token_type(Authorization)).
 
 -spec set_auth_context(cb_context:context(), kz_term:ne_binary(), atom()) ->
-                              cb_context:context().
+          cb_context:context().
 set_auth_context(Context, Token, TokenType) ->
     cb_context:setters(Context, [{fun cb_context:set_auth_token/2, Token}
                                 ,{fun cb_context:set_auth_token_type/2, TokenType}
@@ -877,14 +891,14 @@ get_pretty_print(Req, Context) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec is_permitted(cowboy_req:req(), cb_context:context()) ->
-                          {'true', cowboy_req:req(), cb_context:context()} |
-                          stop_return().
+          {'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 is_permitted(Req, Context) ->
     is_permitted_verb(Req, Context, cb_context:req_verb(Context)).
 
 -spec is_permitted_verb(cowboy_req:req(), cb_context:context(), http_method()) ->
-                               {'true', cowboy_req:req(), cb_context:context()} |
-                               stop_return().
+          {'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 is_permitted_verb(Req, Context, ?HTTP_OPTIONS) ->
     lager:debug("options requests are permitted by default"),
     %% all all OPTIONS, they are harmless (I hope) and required for CORS preflight
@@ -904,8 +918,8 @@ is_permitted_verb(Req, Context0, _ReqVerb) ->
     end.
 
 -spec is_permitted_verb_on_module(cowboy_req:req(), cb_context:context(), http_method(), list()) ->
-                                         {'true', cowboy_req:req(), cb_context:context()} |
-                                         stop_return().
+          {'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 is_permitted_verb_on_module(Req, Context0, _ReqVerb, [{Mod, Params} | _ReqNouns]) ->
     Event = create_event_name(Context0, <<"authorize.", Mod/binary>>),
     Payload = [Context0 | Params],
@@ -917,8 +931,8 @@ is_permitted_verb_on_module(Req, Context0, _ReqVerb, [{Mod, Params} | _ReqNouns]
     end.
 
 -spec is_permitted_nouns(cowboy_req:req(), cb_context:context(), http_method(), list()) ->
-                                {'true', cowboy_req:req(), cb_context:context()} |
-                                stop_return().
+          {'true', cowboy_req:req(), cb_context:context()} |
+          stop_return().
 is_permitted_nouns(Req, Context, _ReqVerb, [{<<"404">>, []}]) ->
     ?MODULE:stop(Req, cb_context:add_system_error('not_found', Context));
 is_permitted_nouns(Req, Context, _ReqVerb, []) ->
@@ -941,7 +955,7 @@ is_permitted_nouns(Req, Context0, _ReqVerb, [{Mod, Params} | _ReqNouns]) ->
     end.
 
 -spec is_known_content_type(cowboy_req:req(), cb_context:context()) ->
-                                   {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 is_known_content_type(Req, Context) ->
     is_known_content_type(Req, Context, cb_context:req_verb(Context)).
 
@@ -967,7 +981,7 @@ is_known_content_type(Req0, Context0, _ReqVerb) ->
     is_known_content_type(Req0, Context1, ensure_content_type(CT), cb_context:content_types_accepted(Context1)).
 
 -spec is_known_content_type(cowboy_req:req(), cb_context:context(), content_type(), list()) ->
-                                   {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 is_known_content_type(Req, Context, CT, []) ->
     is_known_content_type(Req, Context, CT, ?CONTENT_ACCEPTED);
 is_known_content_type(Req, Context, CT, CTAs) ->
@@ -1110,7 +1124,7 @@ is_successful_status('accepted') -> 'true';
 is_successful_status(_Status) -> 'false'.
 
 -spec execute_request(cowboy_req:req(), cb_context:context()) ->
-                             {boolean() | 'stop', cowboy_req:req(), cb_context:context()}.
+          {boolean() | 'stop', cowboy_req:req(), cb_context:context()}.
 execute_request(Req, Context) ->
     case cb_context:req_nouns(Context) of
         [{Mod, Params}|_] ->
@@ -1120,7 +1134,7 @@ execute_request(Req, Context) ->
     end.
 
 -spec execute_request(cowboy_req:req(), cb_context:context(), kz_term:ne_binary(), kz_term:ne_binaries(), http_method()) ->
-                             {boolean() | 'stop', cowboy_req:req(), cb_context:context()}.
+          {boolean() | 'stop', cowboy_req:req(), cb_context:context()}.
 execute_request(Req, Context, Mod, Params, Verb) ->
     Context1 = maybe_set_accepting_charges(Context),
     Event = create_event_name(Context1, [<<"execute">>
@@ -1149,7 +1163,7 @@ maybe_set_accepting_charges(Context) ->
     end.
 
 -spec execute_request_failure(cowboy_req:req(), cb_context:context(), any()) ->
-                                     {'false', cowboy_req:req(), cb_context:context()}.
+          {'false', cowboy_req:req(), cb_context:context()}.
 execute_request_failure(Req, Context, {'error', _E}) ->
     lager:debug("error executing request: ~p", [_E]),
     {'false', Req, Context};
@@ -1158,7 +1172,7 @@ execute_request_failure(Req, Context, _E) ->
     {'false', Req, Context}.
 
 -spec execute_request_results(cowboy_req:req(), cb_context:context(), crossbar_status()) ->
-                                     {'true' | 'stop', cowboy_req:req(), cb_context:context()}.
+          {'true' | 'stop', cowboy_req:req(), cb_context:context()}.
 execute_request_results(Req, Context, 'success') ->
     {'true', Req, Context};
 execute_request_results(Req, Context, 'accepted') ->
@@ -1177,22 +1191,43 @@ finish_request(_Req, Context) ->
     Verb = cb_context:req_verb(Context),
     Event = create_event_name(Context, [<<"finish_request">>, Verb, Mod]),
     _ = kz_util:spawn(fun crossbar_bindings:pmap/2, [Event, Context]),
-    maybe_cleanup_file(cb_context:fetch(Context, 'csv_acc')),
+    _ = kz_util:spawn(fun maybe_cleanup_file/1, [Context]),
     'ok'.
 
--spec maybe_cleanup_file(kz_csv:file_return() | 'undefined') -> 'ok'.
-maybe_cleanup_file({File, _}) ->
-    _Del = file:delete(File),
-    lager:debug("deleting ~s: ~p", [File, _Del]);
-maybe_cleanup_file(_) -> 'ok'.
+-spec maybe_cleanup_file(cb_context:context()) -> 'ok'.
+maybe_cleanup_file(Context) ->
+    File = cb_context:resp_file(Context),
+    CleanupRespFile = cb_context:fetch(Context, 'cleanup_resp_file', 'true'),
+    case kz_term:is_not_empty(File)
+        andalso kz_term:is_true(CleanupRespFile)
+    of
+        'false' -> 'ok';
+        'true' -> cleanup_file(File)
+    end.
 
+-spec cleanup_file(file:filename_all()) -> 'ok'.
+cleanup_file(File) ->
+    case file:read_file_info(File) of
+        {'ok', #file_info{size=Bytes}} ->
+            Sleep = round(math:log(Bytes)) * ?MILLISECONDS_IN_SECOND,
+            cleanup_file(File, Sleep);
+        {'error', _Posix} ->
+            lager:debug("failed to read file: ~p", [_Posix]),
+            cleanup_file(File, 5 * ?MILLISECONDS_IN_SECOND)
+    end.
+
+-spec cleanup_file(file:filename_all(), pos_integer()) -> 'ok'.
+cleanup_file(File, Sleep) ->
+    timer:sleep(Sleep),
+    'ok' = file:delete(File),
+    lager:debug("deleted file ~s", [File]).
 
 %%------------------------------------------------------------------------------
 %% @doc This function will create the content for the response body.
 %% @end
 %%------------------------------------------------------------------------------
 -spec create_resp_content(cowboy_req:req(), cb_context:context()) ->
-                                 {kz_term:ne_binary() | iolist(), cowboy_req:req()}.
+          {kz_term:ne_binary() | iolist(), cowboy_req:req()}.
 create_resp_content(Req0, Context) ->
     Resp = create_resp_envelope(Context),
     Options = get_encode_options(Context),
@@ -1218,6 +1253,33 @@ create_resp_content(Req0, Context) ->
             {<<"failure in request, contact support">>, Req0}
     end.
 
+-spec create_binary_resp_content(cowboy_req:req(), cb_context:context()) ->
+          {iodata(), cowboy_req:req()}.
+create_binary_resp_content(Req, Context) ->
+    case cb_context:response(Context) of
+        {'ok', RespData} -> {RespData, Req};
+        _Else -> {<<>>, Req}
+    end.
+
+-spec create_xml_resp_content(cowboy_req:req(), cb_context:context()) ->
+          {kz_term:ne_binary() | iolist(), cowboy_req:req()}.
+create_xml_resp_content(Req0, Context) ->
+    Req1 = cowboy_req:set_resp_header(<<"content-type">>, <<"text/xml">>, Req0),
+
+    case cb_context:response(Context) of
+        {'ok', RespData} ->
+            {RespData, Req1};
+        {'error', {_ErrorCode, ErrorMsg, _RespData}} ->
+            MsgEl = #xmlElement{name='message'
+                               ,content=[#xmlText{value=ErrorMsg}]
+                               },
+            ErrorEl = #xmlElement{name='error'
+                                 ,content=[MsgEl]
+                                 },
+            Xml = iolist_to_binary(xmerl:export([ErrorEl], 'xmerl_xml')),
+            {Xml, Req1}
+    end.
+
 -spec get_encode_options(cb_context:context()) -> kz_json:encode_options().
 get_encode_options(Context) ->
     case cb_context:pretty_print(Context) of
@@ -1235,12 +1297,12 @@ get_encode_options(Context) ->
                          kz_term:objects().
 
 -spec create_csv_resp_content(cowboy_req:req(), cb_context:context()) ->
-                                     {{'file', file:filename_all()} | 'stop', cowboy_req:req(), cb_context:context()}.
+          {{'file', file:filename_all()} | 'stop', cowboy_req:req(), cb_context:context()}.
 create_csv_resp_content(Req, Context) ->
     check_csv_resp_content(Req, Context, cb_context:resp_data(Context)).
 
 -spec check_csv_resp_content(cowboy_req:req(), cb_context:context(), csv_resp_data()) ->
-                                    {{'file', file:filename_all()} | 'stop', cowboy_req:req(), cb_context:context()}.
+          {{'file', file:filename_all()} | 'stop', cowboy_req:req(), cb_context:context()}.
 check_csv_resp_content(Req, Context, 'undefined') ->
     maybe_create_empty_csv_resp(Req, Context);
 check_csv_resp_content(Req, Context, []) ->
@@ -1283,10 +1345,14 @@ final_csv_resp_type(Context, 'false') ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
+-spec create_csv_resp_content_from_jobjs(cowboy_req:req(), cb_context:context(), kz_json:objects()) ->
+          {resp_file(), cowboy_req:req(), cb_context:context()}.
 create_csv_resp_content_from_jobjs(Req, Context, JObjs) ->
     Context1 = csv_body(Context, JObjs),
     create_csv_resp_content_from_csv_acc(Req, Context1, cb_context:fetch(Context1, 'csv_acc')).
 
+-spec create_csv_resp_content_from_csv_acc(cowboy_req:req(), cb_context:context(), 'undefined' | kz_csv:file_return()) ->
+          {resp_file(), cowboy_req:req(), cb_context:context()}.
 create_csv_resp_content_from_csv_acc(Req, Context, 'undefined') ->
     create_empty_csv_resp(Req, Context);
 create_csv_resp_content_from_csv_acc(Req, Context, {_File, _}=CSVAcc) ->
@@ -1303,7 +1369,7 @@ create_csv_resp_content_from_csv_acc(Req, Context, {_File, _}=CSVAcc) ->
                },
     {{'file', File}
     ,maps:fold(fun(H, V, R) -> cowboy_req:set_resp_header(H, V, R) end, Req, Headers)
-    ,Context
+    ,cb_context:set_resp_file(Context, File)
     }.
 
 %%------------------------------------------------------------------------------
@@ -1320,7 +1386,7 @@ maybe_create_empty_csv_resp(Req, Context) ->
     end.
 
 -spec maybe_create_empty_csv_resp(cowboy_req:req(), cb_context:context(), 'binary' | 'is_chunked' | 'to_csv') ->
-                                         {'stop', cowboy_req:req(), cb_context:context()}.
+          {'stop', cowboy_req:req(), cb_context:context()}.
 maybe_create_empty_csv_resp(Req, Context, 'is_chunked') ->
     case cb_context:fetch(Context, 'chunking_started', 'false') of
         'true' ->
@@ -1344,17 +1410,9 @@ create_empty_csv_resp(Req, Context) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec create_resp_file(cowboy_req:req(), cb_context:context()) ->
-                              {resp_file(), cowboy_req:req()}.
+          {resp_file(), cowboy_req:req()}.
 create_resp_file(Req, Context) ->
-    File = cb_context:resp_file(Context),
-    Len = filelib:file_size(File),
-    Fun = fun(Socket, Transport) ->
-                  lager:debug("sending file ~s", [File]),
-                  Res = Transport:sendfile(Socket, kz_term:to_list(File)),
-                  _ = file:delete(File),
-                  Res
-          end,
-    {{Len, Fun}, Req}.
+    {{'file', cb_context:resp_file(Context)}, Req}.
 
 %%------------------------------------------------------------------------------
 %% @doc Encodes the `JObj' and send it as a chunk. Starts chunk response if is
@@ -1362,13 +1420,13 @@ create_resp_file(Req, Context) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec create_json_chunk_response(cowboy_req:req(), cb_context:context()) ->
-                                        {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 create_json_chunk_response(Req, Context) ->
     JObjs = cb_context:resp_data(Context),
     create_json_chunk_response(Req, Context, JObjs, cb_context:fetch(Context, 'chunking_started', 'false')).
 
 -spec create_json_chunk_response(cowboy_req:req(), cb_context:context(), kz_json:api_objects(), boolean()) ->
-                                        {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 create_json_chunk_response(Req, Context, 'undefined', StartedChunk) ->
     {StartedChunk, Req, Context};
 create_json_chunk_response(Req, Context, [], StartedChunk) ->
@@ -1403,7 +1461,7 @@ do_encode_to_json(JObjs) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec create_csv_chunk_response(cowboy_req:req(), cb_context:context()) ->
-                                       {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 create_csv_chunk_response(Req, Context) ->
     create_csv_chunk_response(Req, Context
                              ,cb_context:resp_data(Context)
@@ -1430,7 +1488,7 @@ create_csv_chunk_response(Req, Context, Thing, IsStarted) ->
 
 
 -spec stream_or_create_csv_chunk(cowboy_req:req(), cb_context:context(), kz_json:objects() | kz_term:ne_binaries(), boolean()) ->
-                                        {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 stream_or_create_csv_chunk(Req, Context, JObjs, 'true') ->
     lager:debug("(chunked) continuing convertion of CSV chunks"),
     {'true', Req, csv_body(Context, JObjs)};
@@ -1482,10 +1540,7 @@ init_chunk_stream(Req, Context, <<"to_csv">>) ->
     cowboy_req:stream_reply(200, maps:merge(cowboy_req:resp_headers(Req), Headers), Req).
 
 -spec csv_body(cb_context:context(), kz_json:object() | kz_json:objects()) ->
-                      cb_context:context().
-csv_body(Context, []) ->
-    lager:debug("no resp data to build CSV from"),
-    Context;
+          cb_context:context().
 csv_body(Context, JObjs) when is_list(JObjs) ->
     Acc1 = case cb_context:fetch(Context, 'csv_acc') of
                'undefined' -> kz_csv:jobjs_to_file(JObjs);
@@ -1505,12 +1560,12 @@ csv_body(Context, JObj) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec create_push_response(cowboy_req:req(), cb_context:context()) ->
-                                  {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 create_push_response(Req0, Context) ->
     create_push_response(Req0, Context, fun create_resp_content/2).
 
 -spec create_push_response(cowboy_req:req(), cb_context:context(), resp_content_fun()) ->
-                                  {boolean(), cowboy_req:req(), cb_context:context()}.
+          {boolean(), cowboy_req:req(), cb_context:context()}.
 create_push_response(Req0, Context, Fun) ->
     {Content, Req1} = Fun(Req0, Context),
     Req2 = set_resp_headers(Req1, Context),
@@ -1524,14 +1579,14 @@ create_push_response(Req0, Context, Fun) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec create_pull_response(cowboy_req:req(), cb_context:context()) ->
-                                  {pull_response(), cowboy_req:req(), cb_context:context()} |
-                                  stop_return().
+          {pull_response(), cowboy_req:req(), cb_context:context()} |
+          stop_return().
 create_pull_response(Req0, Context) ->
     create_pull_response(Req0, Context, fun create_resp_content/2).
 
 -spec create_pull_response(cowboy_req:req(), cb_context:context(), resp_content_fun()) ->
-                                  {pull_response(), cowboy_req:req(), cb_context:context()} |
-                                  stop_return().
+          {pull_response(), cowboy_req:req(), cb_context:context()} |
+          stop_return().
 create_pull_response(Req0, Context0, Fun) ->
     {Content, Req1, Context1} =
         case Fun(Req0, Context0) of
@@ -1544,25 +1599,20 @@ create_pull_response(Req0, Context0, Fun) ->
             lager:info("failed to process pull response in ~p", [Fun]),
             ?MODULE:stop(Req2, Context1);
         'true' ->
-            maybe_set_pull_response_stream(Content, Req2, Context1)
+            maybe_file_pull_response(Content, Req2, Context1)
     end.
 
--spec maybe_set_pull_response_stream(kz_term:text() | resp_file(), cowboy_req:req(), cb_context:context()) ->
-                                            {kz_term:text() | pull_file_resp()
-                                            ,cowboy_req:req()
-                                            ,cb_context:context()
-                                            }.
-maybe_set_pull_response_stream({'file', File}, Req, Context) ->
+-spec maybe_file_pull_response(kz_term:text() | resp_file(), cowboy_req:req(), cb_context:context()) ->
+          {kz_term:text() | 'stop'
+          ,cowboy_req:req()
+          ,cb_context:context()
+          }.
+maybe_file_pull_response({'file', File}, Req, Context) ->
     {'ok', #file_info{size=Size}} = file:read_file_info(File),
     lager:debug("sending file ~s(~p)", [File, Size]),
     Req1 = cowboy_req:reply(200, #{}, {'sendfile', 0, Size, File}, Req),
     {'stop', Req1, cb_context:set_resp_status(Context, 'stop')};
-maybe_set_pull_response_stream({FileLength, TransportFun}, Req, Context)
-  when is_integer(FileLength)
-       andalso is_function(TransportFun, 2) ->
-    lager:debug("streaming file"),
-    {{'stream', FileLength, TransportFun}, Req, Context};
-maybe_set_pull_response_stream(Other, Req, Context) ->
+maybe_file_pull_response(Other, Req, Context) ->
     {Other, Req, Context}.
 
 %%------------------------------------------------------------------------------
@@ -1658,7 +1708,7 @@ decode_start_key(Encoded) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec set_resp_headers(cowboy_req:req(), cb_context:context() | cowboy:http_headers()) ->
-                              cowboy_req:req().
+          cowboy_req:req().
 set_resp_headers(Req0, #{}=Headers) ->
     maps:fold(fun(Header, Value, ReqAcc) ->
                       {H, V} = fix_header(Header, Value, ReqAcc),
@@ -1672,7 +1722,7 @@ set_resp_headers(Req0, Context) ->
     set_resp_headers(Req0, cb_context:resp_headers(Context)).
 
 -spec fix_header(kz_term:text(), kz_term:text(), cowboy_req:req()) ->
-                        {binary(), binary()}.
+          {binary(), binary()}.
 fix_header(<<"Location">>, Path, Req) ->
     {<<"location">>, crossbar_util:get_path(Req, Path)};
 fix_header(<<"location">> = H, Path, Req) ->
@@ -1681,7 +1731,7 @@ fix_header(H, V, _) ->
     {kz_term:to_lower_binary(H), kz_term:to_binary(V)}.
 
 -spec stop(cowboy_req:req(), cb_context:context()) ->
-                  stop_return().
+          stop_return().
 stop(Req0, Context) ->
     StatusCode = cb_context:resp_error_code(Context),
     lager:info("stopping execution here with status code ~p", [StatusCode]),

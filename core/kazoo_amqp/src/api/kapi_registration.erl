@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2019, 2600Hz
+%%% @copyright (C) 2011-2020, 2600Hz
 %%% @doc Handle registration-related APIs, like `reg_success' and `reg_lookup'.
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -25,7 +25,7 @@
         ,publish_query_resp/2, publish_query_resp/3
         ,publish_query_err/2, publish_query_err/3
         ,publish_flush/1, publish_flush/2
-        ,publish_sync/0, publish_sync/1, publish_sync/2
+        ,publish_sync/1, publish_sync/2
         ]).
 
 -include("kz_amqp_util.hrl").
@@ -123,8 +123,8 @@
 %% @end
 %%------------------------------------------------------------------------------
 -spec success(kz_term:api_terms()) ->
-                     {'ok', iolist()} |
-                     {'error', string()}.
+          {'ok', iolist()} |
+          {'error', string()}.
 success(Prop) when is_list(Prop) ->
     case success_v(Prop) of
         'true' -> kz_api:build_message(Prop, ?REG_SUCCESS_HEADERS, ?OPTIONAL_REG_SUCCESS_HEADERS);
@@ -143,8 +143,8 @@ success_v(JObj) -> success_v(kz_json:to_proplist(JObj)).
 %% @end
 %%------------------------------------------------------------------------------
 -spec flush(kz_term:api_terms()) ->
-                   {'ok', iolist()} |
-                   {'error', string()}.
+          {'ok', iolist()} |
+          {'error', string()}.
 flush(Prop) when is_list(Prop) ->
     case flush_v(Prop) of
         'true' -> kz_api:build_message(Prop, ?REG_FLUSH_HEADERS, ?OPTIONAL_REG_FLUSH_HEADERS);
@@ -159,8 +159,8 @@ flush_v(JObj) -> flush_v(kz_json:to_proplist(JObj)).
 
 
 -spec sync(kz_term:api_terms()) ->
-                  {'ok', iolist()} |
-                  {'error', string()}.
+          {'ok', iolist()} |
+          {'error', string()}.
 sync(Prop) when is_list(Prop) ->
     case sync_v(Prop) of
         'true' -> kz_api:build_message(Prop, ?REG_SYNC_HEADERS, ?OPTIONAL_REG_SYNC_HEADERS);
@@ -179,8 +179,8 @@ sync_v(JObj) -> sync_v(kz_json:to_proplist(JObj)).
 %% @end
 %%------------------------------------------------------------------------------
 -spec query_req(kz_term:api_terms()) ->
-                       {'ok', iolist()} |
-                       {'error', string()}.
+          {'ok', iolist()} |
+          {'error', string()}.
 query_req(Prop) when is_list(Prop) ->
     case query_req_v(Prop) of
         'true' -> kz_api:build_message(Prop, ?REG_QUERY_HEADERS, ?OPTIONAL_REG_QUERY_HEADERS);
@@ -199,8 +199,8 @@ query_req_v(JObj) -> query_req_v(kz_json:to_proplist(JObj)).
 %% @end
 %%------------------------------------------------------------------------------
 -spec query_resp(kz_term:api_terms()) ->
-                        {'ok', iolist()} |
-                        {'error', string()}.
+          {'ok', iolist()} |
+          {'error', string()}.
 query_resp(Prop) when is_list(Prop) ->
     case query_resp_v(Prop) of
         'true' -> kz_api:build_message(Prop, ?REG_QUERY_RESP_HEADERS, ?OPTIONAL_REG_QUERY_RESP_HEADERS);
@@ -219,8 +219,8 @@ query_resp_v(JObj) -> query_resp_v(kz_json:to_proplist(JObj)).
 %% @end
 %%------------------------------------------------------------------------------
 -spec query_err(kz_term:api_terms()) ->
-                       {'ok', iolist()} |
-                       {'error', string()}.
+          {'ok', iolist()} |
+          {'error', string()}.
 query_err(Prop) when is_list(Prop) ->
     case query_err_v(Prop) of
         'true' -> kz_api:build_message(Prop, ?REG_QUERY_ERR_HEADERS, ?OPTIONAL_REG_QUERY_ERR_HEADERS);
@@ -339,10 +339,6 @@ publish_query_err(Queue, JObj) ->
 publish_query_err(Queue, Resp, ContentType) ->
     {'ok', Payload} = kz_api:prepare_api_payload(Resp, ?REG_QUERY_ERR_VALUES, fun query_err/1),
     kz_amqp_util:targeted_publish(Queue, Payload, ContentType).
-
--spec publish_sync() -> 'ok'.
-publish_sync() ->
-    kz_amqp_worker:cast(kz_api:default_headers(<<"KAPI">>, <<"1.0">>), fun publish_sync/1).
 
 -spec publish_sync(kz_term:api_terms()) -> 'ok'.
 publish_sync(JObj) ->

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2019, 2600Hz
+%%% @copyright (C) 2013-2020, 2600Hz
 %%% @doc Log messages in a way to make importing to WebSequenceDiagrams.com
 %%% easier
 %%%
@@ -252,8 +252,8 @@ write_to_db(Database, Name, Str, Args) ->
     end.
 
 -spec start_file(kz_term:ne_binary()) ->
-                        {'ok', file:io_device()} |
-                        {'error', any()}.
+          {'ok', file:io_device()} |
+          {'error', any()}.
 start_file(Filename) ->
     _ = file:rename(Filename, iolist_to_binary([Filename, ".", kz_term:to_binary(kz_time:now_s())])),
     file:open(Filename, ['append', 'raw', 'delayed_write']).
@@ -275,8 +275,8 @@ trunc_database(Database, Name) ->
     end.
 
 -spec get_docs_by_name(kz_term:ne_binary(), kz_term:ne_binary()) ->
-                              {'ok', kz_json:objects()} |
-                              {'error', any()}.
+          {'ok', kz_json:objects()} |
+          {'error', any()}.
 get_docs_by_name(Database, Name) ->
     get_docs_by_name(Database, Name, []).
 get_docs_by_name(Database, Name, Opts) ->
@@ -314,7 +314,7 @@ rotate_doc(RotatedName, Doc) ->
 init_db(Database) ->
     lager:debug("refreshing ~s", [Database]),
     Views = kapps_util:get_views_json('webseq', "views"),
-    _ = kapps_util:update_views(Database, Views, 'true'),
+    _ = kz_datamgr:db_view_update(Database, Views, 'true'),
     lager:debug("refreshed ~s", [Database]).
 
 create_filename(<<"/", _/binary>> = Filename) ->

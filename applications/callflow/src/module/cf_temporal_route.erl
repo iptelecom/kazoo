@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2019, 2600Hz
+%%% @copyright (C) 2011-2020, 2600Hz
 %%% @doc Controls and picks Callflows based rules.
 %%%
 %%% <h4>Data options:</h4>
@@ -43,19 +43,19 @@ handle(Data, Call) ->
         <<"menu">> ->
             lager:info("temporal rules main menu"),
             _ = temporal_route_menu(Temporal, rule_ids(Data), Call),
-            cf_exe:stop(Call);
+            cf_exe:continue(Call);
         <<"enable">> ->
             lager:info("force temporal rules to enable"),
             _ = enable_temporal_rules(Temporal, rule_ids(Data), Call),
-            cf_exe:stop(Call);
+            cf_exe:continue(Call);
         <<"disable">> ->
             lager:info("force temporal rules to disable"),
             _ = disable_temporal_rules(Temporal, rule_ids(Data), Call),
-            cf_exe:stop(Call);
+            cf_exe:continue(Call);
         <<"reset">> ->
             lager:info("resume normal temporal rule operation"),
             _ = reset_temporal_rules(Temporal, rule_ids(Data), Call),
-            cf_exe:stop(Call);
+            cf_exe:continue(Call);
         _Action ->
             Rules = get_temporal_rules(Temporal, Call),
             case process_rules(Temporal, Rules, Call) of
@@ -72,7 +72,7 @@ handle(Data, Call) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec process_rules(temporal(), rules(), kapps_call:call()) ->
-                           'default' | binary().
+          'default' | binary().
 process_rules(Temporal
              ,[#rule{enabled='false'
                     ,id=Id

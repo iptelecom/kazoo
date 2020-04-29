@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -25,10 +25,15 @@
 -export([port_resporg/1, port_resporg/2, set_port_resporg/2]).
 -export([port_support_email/1, port_support_email/2, set_port_support_email/2]).
 -export([port_terms/1, port_terms/2, set_port_terms/2]).
+-export([sso_providers/1, sso_providers/2, set_sso_providers/2]).
 -export([twoway_trunks_price/1, twoway_trunks_price/2, set_twoway_trunks_price/2]).
 
--export([fetch/1]).
 -export([fetch_port_authority/2]).
+-export([fetch/1
+        ,type/0
+        ,id/0
+        ,schema/0
+        ]).
 
 -include("kz_documents.hrl").
 
@@ -37,10 +42,24 @@
 
 -define(SCHEMA, <<"whitelabel">>).
 -define(ID, <<"whitelabel">>).
+-define(PVT_TYPE, <<"whitelabel">>).
 
 -spec new() -> doc().
 new() ->
-    kz_json_schema:default_object(?SCHEMA).
+    kz_json:exec([fun(J) -> kz_doc:set_id(J, ?ID) end
+                 ,fun(J) -> kz_doc:set_type(J, ?PVT_TYPE) end
+                 ]
+                ,kz_json_schema:default_object(?SCHEMA)
+                ).
+
+-spec type() -> kz_term:ne_binary().
+type() -> ?PVT_TYPE.
+
+-spec id() -> kz_term:ne_binary().
+id() -> ?ID.
+
+-spec schema() -> kz_term:ne_binary().
+schema() -> ?SCHEMA.
 
 -spec company_name(doc()) -> kz_term:api_binary().
 company_name(Doc) ->
@@ -281,6 +300,18 @@ port_terms(Doc, Default) ->
 set_port_terms(Doc, PortTerms) ->
     kz_json:set_value([<<"port">>, <<"terms">>], PortTerms, Doc).
 
+-spec sso_providers(doc()) -> kz_term:api_objects().
+sso_providers(Doc) ->
+    sso_providers(Doc, 'undefined').
+
+-spec sso_providers(doc(), Default) -> kz_json:objects() | Default.
+sso_providers(Doc, Default) ->
+    kz_json:get_list_value([<<"sso_providers">>], Doc, Default).
+
+-spec set_sso_providers(doc(), kz_json:objects()) -> doc().
+set_sso_providers(Doc, SsoProviders) ->
+    kz_json:set_value([<<"sso_providers">>], SsoProviders, Doc).
+
 -spec twoway_trunks_price(doc()) -> kz_term:api_binary().
 twoway_trunks_price(Doc) ->
     twoway_trunks_price(Doc, 'undefined').
@@ -294,8 +325,8 @@ set_twoway_trunks_price(Doc, TwowayTrunksPrice) ->
     kz_json:set_value([<<"twoway_trunks_price">>], TwowayTrunksPrice, Doc).
 
 -spec fetch(kz_term:api_binary()) ->
-                   {'ok', kz_json:object()} |
-                   {'error', any()}.
+          {'ok', kz_json:object()} |
+          {'error', any()}.
 fetch('undefined') ->
     {'error', 'account_id_undefined'};
 fetch(Account) ->

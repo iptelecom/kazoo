@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -36,7 +36,7 @@
 
 -define(CHILDREN, [?WORKER('kz_amqp_connections')
                   ,?SUPER('kz_amqp_connection_sup')
-                  ,?WORKER('kz_amqp_history')
+                  ,?SUPER('kz_amqp_federated_listeners_sup')
                   ,?WORKER('kz_amqp_assignments')
                   ,?WORKER('kz_amqp_bootstrap')
                   ]).
@@ -134,7 +134,6 @@ pool_pid(Pool) ->
         [] -> 'undefined';
         [P | _] -> P
     end.
-
 
 %%==============================================================================
 %% Supervisor callbacks

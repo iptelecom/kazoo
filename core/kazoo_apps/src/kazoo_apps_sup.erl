@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -36,6 +36,7 @@
                   ,?CACHE_ARGS(?KAPPS_CONFIG_CACHE, ?KAPPS_CONFIG_PROPS)
                   ,?WORKER('kapps_controller')
                   ,?CACHE_ARGS(?KAPPS_GETBY_CACHE, ?KAPPS_GETBY_PROPS)
+                  ,?WORKER('kz_epmd')
                   ]).
 -endif.
 

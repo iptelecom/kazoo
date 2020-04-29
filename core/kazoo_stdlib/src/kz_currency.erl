@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc Various utilities to work with currency.
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -28,7 +28,6 @@
         ,rollover/3
         ,rollover/4
         ]).
--export([modb/1]).
 
 -include_lib("kazoo_stdlib/include/kz_types.hrl").
 
@@ -89,7 +88,7 @@ past_available_units(Account) ->
     kz_ledgers:total_sources_from_previous(Account).
 
 -spec past_available_units(kz_term:ne_binary(), Default) ->
-                                  units() | Default.
+          units() | Default.
 past_available_units(Account, Default) ->
     case past_available_units(Account) of
         {'error', _Reason} -> Default;
@@ -97,12 +96,12 @@ past_available_units(Account, Default) ->
     end.
 
 -spec past_available_units(kz_term:ne_binary(), kz_time:year(), kz_time:month()) ->
-                                  available_units_return().
+          available_units_return().
 past_available_units(Account, Year, Month) ->
     kz_ledgers:total_sources(Account, Year, Month).
 
 -spec past_available_units(kz_term:ne_binary(), kz_time:year(), kz_time:month(), Default) ->
-                                  units() | Default.
+          units() | Default.
 past_available_units(Account, Year, Month, Default) ->
     case kz_ledgers:total_sources(Account, Year, Month) of
         {'error', _Reason} -> Default;
@@ -122,7 +121,7 @@ past_available_dollars(Account) ->
     end.
 
 -spec past_available_dollars(kz_term:ne_binary(), Default) ->
-                                    units() | Default.
+          units() | Default.
 past_available_dollars(Account, Default) ->
     case past_available_units(Account) of
         {'error', _Reason} -> Default;
@@ -131,7 +130,7 @@ past_available_dollars(Account, Default) ->
     end.
 
 -spec past_available_dollars(kz_term:ne_binary(), kz_time:year(), kz_time:month()) ->
-                                    available_dollars_return().
+          available_dollars_return().
 past_available_dollars(Account, Year, Month) ->
     case past_available_units(Account, Year, Month) of
         {'error', _Reason} = Error -> Error;
@@ -140,7 +139,7 @@ past_available_dollars(Account, Year, Month) ->
     end.
 
 -spec past_available_dollars(kz_term:ne_binary(), kz_time:year(), kz_time:month(), Default) ->
-                                    dollars() | Default.
+          dollars() | Default.
 past_available_dollars(Account, Year, Month, Default) ->
     case past_available_units(Account, Year, Month) of
         {'error', _Reason} -> Default;
@@ -189,15 +188,6 @@ rollover(Account, Year, Month) ->
     kz_ledgers:rollover(Account, Year, Month).
 
 -spec rollover(kz_term:ne_binary(),  kz_time:year(), kz_time:month(), units()) ->
-                      available_units_return().
+          available_units_return().
 rollover(Account, Year, Month, Units) ->
     kz_ledgers:rollover(Account, Year, Month, Units).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% @end
-%%------------------------------------------------------------------------------
--spec modb(kz_term:ne_binary()) -> available_units_return().
-modb(MODb) ->
-    {Account, Year, Month} = kazoo_modb_util:split_account_mod(MODb),
-    rollover(Account, Year, Month).

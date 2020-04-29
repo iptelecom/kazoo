@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc Receive call events from FreeSWITCH, publish to the call's event queue
 %%% @author James Aimonetti <james@2600hz.org>
 %%% @author Karl Anderson <karl@2600hz.org>
@@ -404,15 +404,8 @@ handle_info({'usurp_publisher', CallId, RefId, _JObj}, #state{ref=RefId
                                                              ,call_id=CallId
                                                              } = State) ->
     {'noreply', State};
-handle_info({'usurp_publisher', CallId, _RefId, JObj}, #state{call_id=CallId
-                                                             ,node=Node
-                                                             } = State) ->
-    case kz_json:get_atom_value(<<"Media-Node">>, JObj) of
-        Node -> {'noreply', State};
-        OtherNode ->
-            lager:debug("publisher has been usurp'd by newer process on ~s, moving to passive mode", [OtherNode]),
-            {'noreply', State#state{passive='true'}}
-    end;
+handle_info({'usurp_publisher', CallId, _RefId, _JObj}, #state{call_id=CallId} = State) ->
+    {'noreply', State#state{passive='true'}};
 handle_info(_Info, State) ->
     lager:debug("unhandled message: ~p", [_Info]),
     {'noreply', State}.
@@ -537,7 +530,7 @@ create_event(EventName, ApplicationName, Props) ->
       ]).
 
 -spec specific_call_channel_vars_props(kz_term:ne_binary(), kz_term:proplist()) ->
-                                              kz_term:proplist().
+          kz_term:proplist().
 specific_call_channel_vars_props(<<"CHANNEL_DESTROY">>, Props) ->
     UUID = get_call_id(Props),
     ChanVars = kz_json:from_list(ecallmgr_util:custom_channel_vars(Props)),
@@ -1069,7 +1062,8 @@ usurp_other_publishers(#state{node=Node
             ,{<<"Reference">>, Ref}
              | kz_api:default_headers(?APP_NAME, ?APP_VERSION)
             ],
-    kapi_call:publish_usurp_publisher(CallId, Usurp),
+    PublisherFun = fun(P) -> kapi_call:publish_usurp_publisher(CallId, P) end,
+    kz_amqp_worker:cast(Usurp, PublisherFun),
     ecallmgr_usurp_monitor:register('usurp_publisher', CallId, Ref).
 
 -spec get_is_loopback(kz_term:api_binary()) -> atom().

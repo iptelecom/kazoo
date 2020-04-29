@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -66,6 +66,7 @@
 -export([allotments/1, allotments/2
         ,set_allotments/2
         ]).
+-export([inbound_channels_per_did_rules/1, inbound_channels_per_did_rules/2]).
 
 -include("kz_documents.hrl").
 
@@ -463,8 +464,20 @@ set_allotments(Doc, Allotments) ->
 %% @doc
 %% @end
 %%------------------------------------------------------------------------------
+-spec inbound_channels_per_did_rules(doc()) -> kz_json:object().
+inbound_channels_per_did_rules(Doc) ->
+    inbound_channels_per_did_rules(Doc, kz_json:new()).
+
+-spec inbound_channels_per_did_rules(doc(), Default) -> kz_json:object() | Default.
+inbound_channels_per_did_rules(Doc, Default) ->
+    kz_json:get_ne_json_value(<<"pvt_inbound_channels_per_did_rules">>, Doc, Default).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% @end
+%%------------------------------------------------------------------------------
 -spec get_limit(kz_term:ne_binary(), kz_json:object(), tristate_integer()) ->
-                       tristate_integer().
+          tristate_integer().
 get_limit(Key, Doc, Default) ->
     PrivateValue = get_private_limit(Key, Doc),
     PublicValue =  kz_json:get_integer_value(Key, Doc),
@@ -483,7 +496,7 @@ get_limit(Key, Doc, Default) ->
     end.
 
 -spec get_public_limit(kz_term:ne_binary(), kz_json:object(), tristate_integer()) ->
-                              non_neg_integer().
+          non_neg_integer().
 get_public_limit(Key, Doc, Default) ->
     case kz_json:get_integer_value(Key, Doc) of
         'undefined' -> get_default_limit(Key, Default);
@@ -527,7 +540,7 @@ get_public_limit_integer(Key, Doc, Default) ->
 get_default_limit_integer(Key, Default) ->
     kapps_config:get_integer(?LIMITS_CAT, Key, Default).
 
--spec enforce_integer_limit(integer(), integer()) -> integer.
+-spec enforce_integer_limit(integer(), integer()) -> integer().
 enforce_integer_limit(Private, Public) ->
     case Private > Public of
         'true' -> Public;

@@ -36,7 +36,11 @@ Key | Description | Type | Default | Required | Support Level
 `do_not_disturb` | DND Parameters | `object()` |   | `false` |  
 `enabled` | Determines if the device is currently enabled | `boolean()` | `true` | `false` | `supported`
 `exclude_from_queues` | Do not ring this device when calling user/agent in queue | `boolean()` | `false` | `false` |  
+`flags.[]` |   | `string()` |   | `false` | `supported`
+`flags` | Flags set by external applications | `array(string())` |   | `false` | `supported`
 `formatters` | Schema for request formatters | [#/definitions/formatters](#formatters) |   | `false` |  
+`hotdesk.users./^[a-zA-Z0-9]{32}$/` | user-specific hotdesk settings | `object()` |   | `false` |  
+`hotdesk.users` | The user(s) currently hotdesked into the device | `object()` |   | `false` |  
 `hotdesk` | The hotdesk status of this device | `object()` |   | `false` |  
 `language` | The language for the device | `string()` |   | `false` | `supported`
 `mac_address` | The MAC Address of the device (if applicable) | `string()` |   | `false` | `supported`
@@ -245,6 +249,10 @@ Key | Description | Type | Default | Required | Support Level
 `patterns` | A list of patterns with their flows | `object()` |   | `false` |  
 
 
+
+### Call forwarding
+
+Currently the `call_forward` object allows you to define call forwarding *or* failover but not both. If `call_forward.enabled` is `true` it will take precedence and settings will be used only for call forwarding. If `call_forward.enabled` is `false` *and* `call_forward.failover` is `true`, failover settings will be used.
 
 ## Fetch
 

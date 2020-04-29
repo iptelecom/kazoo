@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -172,7 +172,9 @@ setters(Invoice, Routines) ->
 public_json(Invoice) ->
     %% TODO: calculate totals (taxes)...
     ItemsJObjs = kz_services_items:public_json(items(Invoice)),
-    ActivationCharges = kz_services_activation_items:public_json(activation_charges(Invoice)),
+    ActivationCharges = kz_services_activation_items:public_json(
+                          activation_charges(Invoice)
+                         ),
     PlanJObj = kz_services_plan:jobj(plan(Invoice)),
     Props = [{<<"activation_charges">>, ActivationCharges}
             ,{<<"items">>, ItemsJObjs}

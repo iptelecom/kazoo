@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2012-2019, 2600Hz
+%%% @copyright (C) 2012-2020, 2600Hz
 %%% @doc
 %%% @author Karl Anderson
 %%% @end
@@ -15,7 +15,9 @@
         ,whapp_oldest_node/1
         ,whapp_oldest_node/2
         ]).
--export([status/0]).
+-export([status/0
+        ,status_to_json/0
+        ]).
 -export([flush/0]).
 -export([handle_advertise/2]).
 -export([notify_new/0
@@ -34,6 +36,8 @@
 
 -export([with_role/1, with_role/2]).
 -export([print_role/1]).
+-export([nodes/0]).
+
 -export([init/1
         ,handle_call/3
         ,handle_cast/2
@@ -261,6 +265,63 @@ determine_whapp_zones_fold({Zone, Whapps}, {Whapp, Zones, C}=Acc) ->
         'true' -> {Whapp, [Zone | Zones], C+ 1};
         'false' -> Acc
     end.
+
+-spec status_to_json() -> kz_json:object().
+status_to_json() ->
+    try
+        Nodes = lists:sort(fun compare_nodes/2, ets:tab2list(?MODULE)),
+        lists:foldl(fun node_status_to_json/2, kz_json:new(), Nodes)
+    catch
+        'error':'badarg' ->
+            kz_json:set_value(<<"error">>
+                             ,<<"status unknown until node is fully initialized, try again in a moment\n">>
+                             ,kz_json:new()
+                             )
+    end.
+
+-spec node_status_to_json(kz_types:kz_node(), kz_json:object()) -> kz_json:object().
+node_status_to_json(#kz_node{zone=NodeZone
+                            ,node=N
+                            ,md5=MD5
+                            ,version=Version
+                            ,processes=Processes
+                            ,ports=Ports
+                            ,used_memory=UsedMemory
+                            ,broker=Broker
+                            ,kapps=Kapps
+                            ,globals=Globals
+                            ,node_info=NodeInfo
+                            ,roles=Roles
+                            ,media_servers=MediaServers
+                            ,registrations=Regs
+                            ,channels=Channels
+                            ,conferences=Conferences
+                            }=_Node
+                   ,Acc
+                   ) ->
+    StatusProps = props:filter_empty(
+                    [{<<"node">>, kz_term:to_binary(N)}
+                    ,{<<"md5">>, MD5}
+                    ,{<<"version">>, Version}
+                    ,{<<"used_memory">>, kz_term:to_binary(kz_network_utils:pretty_print_bytes(UsedMemory))}
+                    ,{<<"processes">>, Processes}
+                    ,{<<"ports">>, Ports}
+                    ,{<<"zone">>, kz_term:to_binary(NodeZone)}
+                    ,{<<"broker">>, Broker}
+                    ,{<<"kapps">>, [K || {K, _} <- Kapps]}
+                    ,{<<"globals">>, kz_json:from_list(Globals)}
+                    ,{<<"node_info">>, NodeInfo}
+                    ,{<<"roles">>, kz_json:from_list(Roles)}
+                    ,{<<"media_servers">>, [K || {K, _} <- MediaServers]}
+                    ,{<<"channels">>, Channels}
+                    ,{<<"conferences">>, Conferences}
+                    ,{<<"registrations">>, Regs}
+                    ]),
+    [NodeType,_] = binary:split(kz_term:to_binary(N), <<"@">>),
+    kz_json:set_value([kz_term:to_binary(NodeZone), NodeType, kz_term:to_binary(N)]
+                     ,kz_json:from_list(StatusProps)
+                     ,Acc
+                     ).
 
 -spec status() -> 'no_return'.
 status() ->
@@ -556,7 +617,9 @@ print_each_node_info(KV) ->
 print_node_info({K, ?NE_BINARY = V}) ->
     io:format("~s: ~s~n", [K, V]);
 print_node_info({K, V}) when is_integer(V) ->
-    io:format("~s: ~B~n", [K, V]).
+    print_simple_row([K, V]);
+print_node_info({K, JObj}) ->
+    io:format("~s: ~s~n", [K, kz_json:encode(JObj)]).
 
 -spec status_list(kz_types:kapps_info(), 0..4) -> 'ok'.
 status_list([], _) -> io:format("~n", []);
@@ -621,6 +684,22 @@ handle_advertise(JObj, Props) ->
         'true' -> 'ok'
     end.
 
+-spec build_advertised_node(kz_json:object(), nodes_state()) -> kz_types:kz_node() | 'ok'.
+build_advertised_node(JObj, State) ->
+    try
+        from_json(JObj, State)
+    catch
+        _E:_R ->
+            lager:warning("error building advertised node : ~p", [{_E, _R}])
+    end.
+
+-spec update_advertised_node(kz_types:kz_node(), nodes_state()) -> pid() | 'true'.
+update_advertised_node(Node, #state{tab=Tab}=State) ->
+    case ets:insert_new(Tab, Node) of
+        'true' -> kz_util:spawn(fun notify_new/2, [Node, State]);
+        'false' -> ets:insert(Tab, Node)
+    end.
+
 %%%=============================================================================
 %%% gen_server callbacks
 %%%=============================================================================
@@ -668,6 +747,9 @@ handle_call({'print_status', Nodes}, _From, State) ->
     {'reply', 'ok', State};
 handle_call('zone', _From, #state{zone=Zone}=State) ->
     {'reply', Zone, State};
+handle_call('nodes', _From, State) ->
+    Nodes = lists:sort(fun compare_nodes/2, ets:tab2list(?MODULE)),
+    {'reply', Nodes, State};
 handle_call(_Request, _From, State) ->
     {'reply', {'error', 'not_implemented'}, State}.
 
@@ -682,13 +764,13 @@ handle_cast({'notify_new', Pid}, #state{notify_new=Set}=State) ->
 handle_cast({'notify_expire', Pid}, #state{notify_expire=Set}=State) ->
     _ = erlang:monitor('process', Pid),
     {'noreply', State#state{notify_expire=sets:add_element(Pid, Set)}};
-handle_cast({'advertise', JObj}, #state{tab=Tab}=State) ->
-    #kz_node{}=Node = from_json(JObj, State),
-    _ = case ets:insert_new(Tab, Node) of
-            'true' -> kz_util:spawn(fun notify_new/2, [Node, State]);
-            'false' -> ets:insert(Tab, Node)
-        end,
-    {'noreply', maybe_add_zone(Node, State)};
+handle_cast({'advertise', JObj}, State) ->
+    case build_advertised_node(JObj, State) of
+        #kz_node{}=Node ->
+            _ = update_advertised_node(Node, State),
+            {'noreply', maybe_add_zone(Node, State)};
+        'ok' -> {'noreply', State}
+    end;
 handle_cast({'gen_listener', {'created_queue', _Q}}, State) ->
     lager:info("nodes acquired queue name ~s, starting remote heartbeats", [_Q]),
     {'noreply', State};
@@ -739,12 +821,16 @@ handle_info({'heartbeat', Ref}
     Heartbeat = ?HEARTBEAT,
     Reference = erlang:make_ref(),
     _ = erlang:send_after(Heartbeat, self(), {'heartbeat', Reference}),
-    try create_node(Heartbeat, State) of
-        Node ->
-            _ = ets:insert(Tab, Node),
-            _ = kz_amqp_worker:cast(advertise_payload(Node), fun kapi_nodes:publish_advertise/1),
-            {'noreply', State#state{heartbeat_ref=Reference, me=Node}}
+
+    try
+        Node = #kz_node{broker=Broker} = create_node(Heartbeat, State),
+        _ = ets:insert(Tab, Node),
+        _ = Broker =/= <<"disconnected">>
+            andalso kapi_nodes:publish_advertise(advertise_payload(Node)),
+        {'noreply', State#state{heartbeat_ref=Reference, me=Node}}
     catch
+        _:{noproc,_} ->
+            {'noreply', State#state{heartbeat_ref=Reference}, 'hibernate'};
         'exit' : {'timeout' , _} when Me =/= 'undefined' ->
             NewMe = Me#kz_node{expires=Heartbeat},
             _ = ets:insert(Tab, NewMe),
@@ -839,7 +925,8 @@ create_node(Heartbeat, #state{zone=Zone
                            ,node_info=node_info()
                            }).
 
--spec normalize_amqp_uri(kz_term:ne_binary()) -> kz_term:ne_binary().
+-spec normalize_amqp_uri(kz_term:api_ne_binary()) -> kz_term:ne_binary().
+normalize_amqp_uri('undefined') -> <<"disconnected">>;
 normalize_amqp_uri(URI) ->
     kz_term:to_binary(amqp_uri:remove_credentials(kz_term:to_list(URI))).
 
@@ -1098,7 +1185,7 @@ whapp_oldest_node(Whapp, Zone)
     determine_whapp_oldest_node(kz_term:to_binary(Whapp), MatchSpec).
 
 -spec determine_whapp_oldest_node(kz_term:ne_binary(), ets:match_spec()) ->
-                                         'undefined' | node().
+          'undefined' | node().
 determine_whapp_oldest_node(Whapp, MatchSpec) ->
     case oldest_whapp_node(Whapp, MatchSpec) of
         {Node, _Start} -> Node;
@@ -1109,7 +1196,7 @@ determine_whapp_oldest_node(Whapp, MatchSpec) ->
                              {node(), kz_time:gregorian_seconds()}.
 
 -spec oldest_whapp_node(kz_term:ne_binary(), ets:match_spec()) ->
-                               oldest_whapp_node().
+          oldest_whapp_node().
 oldest_whapp_node(Whapp, MatchSpec) ->
     lists:foldl(fun({Whapps, _Node}=Info, Acc) when is_list(Whapps) ->
                         determine_whapp_oldest_node_fold(Info, Acc, Whapp)
@@ -1119,7 +1206,7 @@ oldest_whapp_node(Whapp, MatchSpec) ->
                ).
 
 -spec determine_whapp_oldest_node_fold({kz_types:kapps_info(), node()}, oldest_whapp_node(), kz_term:ne_binary()) ->
-                                              oldest_whapp_node().
+          oldest_whapp_node().
 determine_whapp_oldest_node_fold({Whapps, Node}, 'undefined', Whapp) ->
     case props:get_value(Whapp, Whapps) of
         'undefined' -> 'undefined';
@@ -1145,7 +1232,20 @@ maybe_add_zone(#kz_node{zone=Zone, broker=B}, #state{zones=Zones}=State) ->
 
 -spec node_info() -> kz_json:object().
 node_info() ->
-    kz_json:from_list(pool_states()).
+    kz_json:from_list(pool_states()
+                      ++ amqp_status()
+                     ).
+
+-spec amqp_status() -> [{kz_term:ne_binary(), kz_json:object()}].
+amqp_status() ->
+    Connections = kz_amqp_connections:connections(),
+    [amqp_status_connection(Connection) || Connection <- Connections].
+
+-spec amqp_status_connection(kz_amqp_connections:kz_amqp_connections()) -> {kz_term:ne_binary(), kz_json:object()}.
+amqp_status_connection(Connection) ->
+    Count = kz_amqp_assignments:channel_count(Connection),
+    Broker = kz_amqp_connection:broker(Connection),
+    {Broker, kz_json:from_list([{<<"channel_count">>, Count}])}.
 
 -spec pool_states() -> kz_term:proplist().
 pool_states() ->
@@ -1293,3 +1393,7 @@ with_role_filter(Role, MatchSpec) ->
                ,[]
                ,ets:select(?MODULE, MatchSpec)
                ).
+
+-spec nodes() -> kz_types:kz_nodes().
+nodes() ->
+    gen_listener:call(?MODULE, 'nodes').

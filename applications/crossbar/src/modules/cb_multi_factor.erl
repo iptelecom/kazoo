@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc Multi factor authentication configuration API endpoint
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -49,14 +49,14 @@ init() ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec authorize(cb_context:context()) ->
-                       boolean() |
-                       {'stop', cb_context:context()}.
+          boolean() |
+          {'stop', cb_context:context()}.
 authorize(Context) ->
     authorize_system_multi_factor(Context, cb_context:req_nouns(Context), cb_context:req_verb(Context)).
 
 -spec authorize(cb_context:context(), path_token()) ->
-                       boolean() |
-                       {'stop', cb_context:context()}.
+          boolean() |
+          {'stop', cb_context:context()}.
 authorize(Context, _) ->
     authorize_system_multi_factor(Context, cb_context:req_nouns(Context), cb_context:req_verb(Context)).
 
@@ -64,8 +64,8 @@ authorize(Context, _) ->
 authorize(_Context, _, _) -> 'true'.
 
 -spec authorize_system_multi_factor(cb_context:context(), req_nouns(), http_method()) ->
-                                           boolean() |
-                                           {'stop', cb_context:context()}.
+          boolean() |
+          {'stop', cb_context:context()}.
 authorize_system_multi_factor(_, [{<<"multi_factor">>, []}], ?HTTP_GET) -> 'true';
 authorize_system_multi_factor(C, [{<<"multi_factor">>, []}], ?HTTP_PUT) -> cb_context:is_superduper_admin(C);
 authorize_system_multi_factor(C, [{<<"multi_factor">>, _}], ?HTTP_GET) -> cb_context:is_superduper_admin(C);
@@ -128,7 +128,7 @@ validate(Context) ->
 
 -spec validate(cb_context:context(), path_token()) -> cb_context:context().
 validate(Context, ?ATTEMPTS) ->
-    Options = [{mapper, crossbar_view:map_value_fun()}
+    Options = [{'mapper', crossbar_view:map_value_fun()}
               ,{'range_keymap', <<"multi_factor">>}
               ],
     crossbar_view:load_modb(Context, ?CB_LIST_ATTEMPT_LOG, Options);
@@ -254,9 +254,11 @@ summary(Context) ->
     Options = [{'startkey', [<<"multi_factor">>]}
               ,{'endkey', [<<"multi_factor">>, kz_json:new()]}
               ,{'unchunkable', 'true'}
-              ,{'mapper', fun(JObjs) -> normalize_summary(Context, JObjs) end}
+              ,{'mapper', crossbar_view:map_value_fun()}
               ],
-    crossbar_view:load(Context, <<"auth/providers_by_type">>, Options).
+    C1 = crossbar_view:load(Context, <<"auth/providers_by_type">>, Options),
+    C2 = system_summary(Context),
+    cb_context:set_resp_data(C1, merge_summary(cb_context:resp_data(C1), cb_context:resp_data(C2))).
 
 system_summary(Context) ->
     Options = [{'startkey', [<<"multi_factor">>]}
@@ -266,14 +268,6 @@ system_summary(Context) ->
               ,{'unchunkable', 'true'}
               ],
     crossbar_view:load(Context, <<"providers/list_by_type">>, Options).
-
--spec normalize_summary(cb_context:context(), kz_json:objects()) -> kz_json:object().
-normalize_summary(Context, JObjs) ->
-    C1 = system_summary(Context),
-    case cb_context:resp_status(C1) of
-        'success' -> merge_summary(JObjs, cb_context:doc(C1));
-        _ -> merge_summary(JObjs, [])
-    end.
 
 -spec merge_summary(kz_json:objects(), kz_json:objects()) -> kz_json:object().
 merge_summary(Configured, Available) ->

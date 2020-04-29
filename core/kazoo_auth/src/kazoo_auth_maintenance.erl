@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2016-2019, 2600Hz
+%%% @copyright (C) 2016-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -46,8 +46,8 @@ register_auth_app(AccountId, OAuthId, Secret, Provider) ->
     end.
 
 -spec register_auth_app_key(kz_term:ne_binary(), kz_term:ne_binary()) ->
-                                   {'ok', kz_json:object()} |
-                                   kz_datamgr:data_error().
+          {'ok', kz_json:object()} |
+          kz_datamgr:data_error().
 register_auth_app_key(AppId, PemFile) ->
     Pem = kz_auth_keys:get_private_key_from_file(PemFile),
     KeyId = kz_binary:rand_hex(16),
@@ -68,7 +68,8 @@ refresh() ->
 init_db('false') ->
     lager:error("error trying to create auth database");
 init_db('true') ->
-    kapps_maintenance:refresh(?KZ_AUTH_DB).
+    _ = kapps_maintenance:refresh(?KZ_AUTH_DB),
+    'ok'.
 
 -spec register_views() -> 'ok'.
 register_views() ->

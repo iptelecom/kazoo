@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc Conversion of types.
 %%% @author James Aimonetti
 %%% @author Karl Anderson
@@ -8,6 +8,7 @@
 -module(kz_term).
 
 -export([shuffle_list/1]).
+-export([uniq_list/1]).
 
 -export([to_integer/1, to_integer/2
         ,to_float/1, to_float/2
@@ -37,6 +38,7 @@
         ,is_boolean/1
         ,is_ne_binary/1, is_api_ne_binary/1
         ,is_ne_binaries/1
+        ,is_ne_binary_or_binaries/1
         ,is_empty/1, is_not_empty/1
         ,is_proplist/1, is_ne_list/1
         ,is_pos_integer/1
@@ -65,6 +67,7 @@
 %% Denotes definition of each key-value in a proplist.
 
 -type proplist() :: [proplist_property()].
+-type api_proplist() :: proplist() | 'undefined'.
 %% A key-value form of data, `[{Key, Value}|atom]'.
 
 -type proplists() :: [proplist()].
@@ -179,6 +182,7 @@
              ,api_pid_ref/0
              ,api_pid_refs/0
              ,api_pos_integer/0
+             ,api_proplist/0
              ,api_reference/0
              ,api_string/0
              ,api_terms/0
@@ -232,7 +236,18 @@ randomize_list(T, List) ->
                ,lists:seq(1, (T - 1))
                ).
 
-%% must be a term that can be changed to a list
+%%------------------------------------------------------------------------------
+%% @doc
+%% @end
+%%------------------------------------------------------------------------------
+-spec uniq_list(list()) -> list().
+uniq_list([]) -> [];
+uniq_list([H|T]) -> [H | [X || X <- uniq_list(T), X =/= H]].
+
+%%------------------------------------------------------------------------------
+%% @doc must be a term that can be changed to a list
+%% @end
+%%------------------------------------------------------------------------------
 -spec to_hex(text()) -> string().
 to_hex(S) ->
     string:to_lower(lists:flatten([io_lib:format("~2.16.0B", [H]) || H <- to_list(S)])).
@@ -407,15 +422,20 @@ is_ne_binary(V) ->
         andalso not is_empty(V).
 
 -spec is_api_ne_binary(any()) -> boolean().
-is_api_ne_binary(undefined) -> true;
+is_api_ne_binary('undefined') -> 'true';
 is_api_ne_binary(V) -> is_ne_binary(V).
 
 -spec is_ne_binaries(any()) -> boolean().
-is_ne_binaries([]) -> true;
+is_ne_binaries([]) -> 'true';
 is_ne_binaries(V)
   when is_list(V) ->
     lists:all(fun is_ne_binary/1, V);
-is_ne_binaries(_) -> false.
+is_ne_binaries(_) -> 'false'.
+
+-spec is_ne_binary_or_binaries(any()) -> boolean().
+is_ne_binary_or_binaries(V) ->
+    is_ne_binary(V)
+        orelse is_ne_binaries(V).
 
 -spec is_boolean(binary() | string() | atom()) -> boolean().
 is_boolean(<<"true">>) -> 'true';
@@ -445,6 +465,9 @@ is_empty('null') -> 'true';
 is_empty('undefined') -> 'true';
 
 is_empty(Float) when is_float(Float), Float =:= 0.0 -> 'true';
+
+is_empty(Map) when is_map(Map), map_size(Map) =:= 0 -> 'true';
+is_empty(Map) when is_map(Map) -> 'false';
 
 is_empty(MaybeJObj) ->
     case kz_json:is_json_object(MaybeJObj) of

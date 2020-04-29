@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2019, 2600Hz
+%%% @copyright (C) 2011-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -215,20 +215,15 @@ connection_summary({[#kz_amqp_connections{connection=Connection
                                          ,broker=Broker
                                          ,available=Available
                                          ,zone=Zone
-                                         }
+                                         }=Conn
                     ], Continuation
                    }
                   ,PrimaryBroker) ->
-    MatchSpec = [{#kz_amqp_assignment{connection=Connection
-                                     ,_='_'
-                                     },
-                  [],
-                  ['true']}
-                ],
+
     io:format("| ~-48s | ~-16w | ~-8B | ~-9s | ~-10s | ~-7s |~n"
              ,[Broker
               ,Connection
-              ,ets:select_count(?ASSIGNMENTS, MatchSpec)
+              ,kz_amqp_assignments:channel_count(Conn)
               ,Available
               ,Zone
               ,Broker =:= PrimaryBroker
@@ -381,25 +376,26 @@ broker_summary_prechannels(Broker) ->
 %%------------------------------------------------------------------------------
 -spec channel_summary() -> 'ok'.
 channel_summary() ->
-    io:format("+--------------------------------------------------+----------+----------+-----------------+-----------------+-----------------+----------+----------+~n"),
-    io:format("| Broker                                           |   Age    | Assigned |     Consumer    |     Channel     |   Connection    |   Type   | Watchers |~n"),
-    io:format("+==================================================+==========+==========+=================+=================+=================+==========+==========+~n"),
+    io:format("+--------------------------------------------------+----------+----------+----------------------+-----------------+-----------------+-----------------+----------+----------+~n"),
+    io:format("| Broker                                           |   Age    | Assigned |      Application     |     Consumer    |     Channel     |   Connection    |   Type   | Watchers |~n"),
+    io:format("+==================================================+==========+==========+======================+=================+=================+=================+==========+==========+~n"),
     Pattern = #kz_amqp_assignment{_='_'},
     channel_summary(ets:match_object(?ASSIGNMENTS, Pattern, 1)).
 
 channel_summary('$end_of_table') -> 'ok';
 channel_summary({[#kz_amqp_assignment{}=Assignment], Continuation}) ->
-    io:format("| ~-48s | ~-8B | ~-8B | ~-15w | ~-15w | ~-15w | ~-8s | ~-8B |~n"
+    io:format("| ~-48s | ~-8B | ~-8B | ~-20w | ~-15w | ~-15w | ~-15w | ~-8s | ~-8B |~n"
              ,[Assignment#kz_amqp_assignment.broker
               ,channel_summary_age(Assignment#kz_amqp_assignment.timestamp)
               ,channel_summary_age(Assignment#kz_amqp_assignment.assigned)
+              ,Assignment#kz_amqp_assignment.application
               ,Assignment#kz_amqp_assignment.consumer
               ,Assignment#kz_amqp_assignment.channel
               ,Assignment#kz_amqp_assignment.connection
               ,Assignment#kz_amqp_assignment.type
               ,sets:size(Assignment#kz_amqp_assignment.watchers)
               ]),
-    io:format("+--------------------------------------------------+----------+----------+-----------------+-----------------+-----------------+----------+----------+~n"),
+    io:format("+--------------------------------------------------+----------+----------+----------------------+-----------------+-----------------+-----------------+----------+----------+~n"),
     channel_summary(ets:match_object(Continuation)).
 
 channel_summary_age('undefined') -> 0;
@@ -479,12 +475,6 @@ print_consumer_details(Consumer) when is_pid(Consumer) ->
                 io:format("  ~-10s: ~p~n", ["Connection", Connection]),
                 io:format("  ~-10s: ~p~n", ["Type", Type])
         end,
-    _ = case kz_amqp_history:get(Consumer) of
-            [] -> 'ok';
-            History ->
-                io:format("  ~-10s:~n", ["History"]),
-                print_consumer_history(History)
-        end,
     _ = case is_process_alive(Consumer) of
             'false' -> 'ok';
             'true' ->
@@ -493,12 +483,6 @@ print_consumer_details(Consumer) when is_pid(Consumer) ->
                 io:format(binary:replace(Backtrace, <<"\n">>, <<"~n    ">>, ['global']), [])
         end,
     io:format("~n", []).
-
-print_consumer_history([]) -> 'ok';
-print_consumer_history([Command|Commands]) ->
-    {'$lager_record', Name, Props} = lager:pr(Command, ?MODULE),
-    io:format("    ~s~n      ~p~n", [Name, Props]),
-    print_consumer_history(Commands).
 
 -spec gc_pools() -> 'ok'.
 gc_pools() ->
@@ -551,7 +535,7 @@ print_gc_summary(Results) ->
     io:format("  Min/Avg/Max of ~p workers: ~s~n", [Count, Summary]).
 
 -spec gc_summary([{pid(), integer(), integer(), integer()}]) ->
-                        {integer(), integer(), integer(), integer()}.
+          {integer(), integer(), integer(), integer()}.
 gc_summary([{_W, Diff, _B, _A} | Results]) ->
     lists:foldl(fun gc_summary_fold/2
                ,{Diff, Diff, Diff, 1}
@@ -561,7 +545,7 @@ gc_summary([{_W, Diff, _B, _A} | Results]) ->
 -spec gc_summary_fold({pid(), integer(), integer(), integer()}
                      ,{integer(), integer(), integer(), integer()}
                      ) ->
-                             {integer(), integer(), integer(), integer()}.
+          {integer(), integer(), integer(), integer()}.
 gc_summary_fold({_W, Diff, _B, _A}
                ,{Min, Max, Sum, Count}
                ) ->

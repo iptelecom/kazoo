@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc
 %%% @author Peter Defebvre
 %%% @end
@@ -77,7 +77,7 @@ fix_numbers(_DataJObj, _TemplateId, PortReqJObj) ->
                            ),
     kzd_port_requests:set_numbers(PortReqJObj, Numbers).
 
--spec get_numbers(kz_json:object()) -> kz_term:ne_binaries().
+-spec get_numbers(kz_json:object()) -> kz_json:objects().
 get_numbers(PortReqJObj) ->
     case kzd_port_requests:pvt_port_state(PortReqJObj) of
         ?PORT_COMPLETED ->
@@ -118,7 +118,7 @@ fix_bill_object(PortReqJObj) ->
     fix_bill_object(PortReqJObj, KeyMap).
 
 -spec fix_bill_object(kz_json:object(), [{kz_term:ne_binary(), [kz_term:ne_binary() | {kz_term:ne_binary(), kz_term:ne_binary()}]}]) ->
-                             kz_json:object().
+          kz_json:object().
 fix_bill_object(PortReqJObj, []) -> PortReqJObj;
 fix_bill_object(PortReqJObj, [{Category, KeyMaps} | Rest]) ->
     NewPort = lists:foldl(fun(KeyMap, Acc) -> fix_bill_object(Acc, Category, KeyMap) end
@@ -128,7 +128,7 @@ fix_bill_object(PortReqJObj, [{Category, KeyMaps} | Rest]) ->
     fix_bill_object(NewPort, Rest).
 
 -spec fix_bill_object(kz_json:object(), kz_term:ne_binary(), kz_term:ne_binary() | {kz_term:ne_binary(), kz_term:ne_binary()}) ->
-                             kz_json:object().
+          kz_json:object().
 fix_bill_object(PortReqJObj, Category, {OldKeyName, NewKeyName}) ->
     kz_json:set_value([<<"bill">>, Category, NewKeyName]
                      ,kz_json:get_ne_binary_value([<<"bill">>, OldKeyName], PortReqJObj, <<"-">>)
@@ -325,11 +325,11 @@ is_attachable_template(TemplateId) ->
                  ]
                 ).
 
--spec maybe_add_attachments(kz_json:object(), kz_term:ne_binary()) -> attachments().
+-spec maybe_add_attachments(kz_json:object(), kz_term:ne_binary()) -> kz_json:object().
 maybe_add_attachments(DataJObj, TemplateId) ->
     maybe_add_attachments(DataJObj, is_attachable_template(TemplateId), teletype_util:is_preview(DataJObj)).
 
--spec maybe_add_attachments(kz_json:object(), boolean(), boolean()) -> attachments().
+-spec maybe_add_attachments(kz_json:object(), boolean(), boolean()) -> kz_json:object().
 maybe_add_attachments(DataJObj, _, 'true') ->
     DataJObj;
 maybe_add_attachments(DataJObj, 'true', 'false') ->
@@ -344,7 +344,7 @@ maybe_add_attachments(DataJObj, _, 'false') ->
     DataJObj.
 
 -spec get_attachment_fold(kz_json:key(), attachments(), kz_term:ne_binary(), kz_json:object()) ->
-                                 attachments().
+          attachments().
 get_attachment_fold(Name, Acc, PortReqId, Doc) ->
     case kz_datamgr:fetch_attachment(?KZ_PORT_REQUESTS_DB, PortReqId, Name) of
         {'ok', Attachment} ->
@@ -409,11 +409,8 @@ maybe_get_submitter(DataJObj, TemplateId, 'false') ->
 
 -spec is_comment_private(kz_json:object(), kz_term:ne_binary()) -> boolean().
 is_comment_private(DataJObj, TemplateId) ->
-    SuperPaths = [[<<"comment">>, <<"superduper_comment">>]
-                 ,[<<"comment">>, <<"is_private">>]
-                 ],
     teletype_port_comment:id() =:= TemplateId
-        andalso kz_term:is_true(kz_json:get_first_defined(SuperPaths, DataJObj, 'false')).
+        andalso kzd_comment:is_private_legacy(kz_json:get_json_value(<<"comment">>, DataJObj, kz_json:new())).
 
 -spec get_port_submitter_emails(kz_json:object()) -> kz_term:api_binaries().
 get_port_submitter_emails(DataJObj) ->
@@ -455,17 +452,11 @@ maybe_use_port_support(PortAuthority) ->
     case kzd_whitelabel:fetch(PortAuthority) of
         {'ok', JObj} ->
             case kzd_whitelabel:port_support_email(JObj) of
-                ?NE_BINARY = Email ->
+                <<Email/binary>>->
                     lager:debug("using port support emails from port authority ~s", [PortAuthority]),
                     [Email];
-                [] ->
-                    lager:debug("no port support, maybe using port authority admins"),
-                    maybe_use_port_authority_admins(PortAuthority);
-                Emails when is_list(Emails) ->
-                    lager:debug("using port support emails from port authority ~s", [PortAuthority]),
-                    Emails;
-                _ ->
-                    lager:debug("no port support, maybe using port authority admins"),
+                _Else ->
+                    lager:debug("no port support, maybe using port authority admins: ~p", [_Else]),
                     maybe_use_port_authority_admins(PortAuthority)
             end;
         {'error', _} ->
@@ -479,10 +470,7 @@ maybe_use_port_authority_admins(PortAuthority) ->
         'undefined' ->
             lager:debug("~s doesn't have any admins, fallback to template emails", [PortAuthority]),
             'undefined';
-        [] ->
-            lager:debug("~s doesn't have any admins, fallback to template emails", [PortAuthority]),
-            'undefined';
-        Admins ->
+        [_|_]=Admins ->
             lager:debug("using admin emails from ~s", [PortAuthority]),
             Admins
     end.
@@ -506,10 +494,7 @@ maybe_use_master_admins(TemplateId, _, MasterAccountId) ->
         'undefined' ->
             lager:debug("master doesn't have any admins, maybe using default_to from system template"),
             maybe_use_system_emails(TemplateId);
-        [] ->
-            lager:debug("master doesn't have any admins, maybe using default_to from system template"),
-            maybe_use_system_emails(TemplateId);
-        Admins ->
+        [_|_]=Admins ->
             lager:debug("using admin emails from ~s", [MasterAccountId]),
             Admins
     end.
@@ -523,7 +508,7 @@ maybe_use_system_emails(TemplateId) ->
         [] ->
             lager:debug("system template doesn't have default_to"),
             'undefined';
-        ?NE_BINARY = To ->
+        <<To/binary>> ->
             lager:debug("using default_to from system template"),
             [To];
         Emails when is_list(Emails) ->

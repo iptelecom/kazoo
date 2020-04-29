@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2013-2019, 2600Hz
+%%% @copyright (C) 2013-2020, 2600Hz
 %%% @doc
 %%% @author Sergey Korobkov
 %%% @end
@@ -385,7 +385,7 @@ refresh_selectors_index(Db) ->
 init_db(Db) ->
     _Created = kz_datamgr:db_create(Db),
     lager:debug("created ~s: ~s", [Db, _Created]),
-    kapps_maintenance:refresh(Db),
+    _ = kapps_maintenance:refresh(Db),
     lager:info("initialized new ratedeck ~s", [Db]).
 
 -spec maybe_delete_rate(kz_json:object(), dict:dict()) -> kz_json:object() | 'false'.
@@ -451,7 +451,7 @@ maybe_generate_weight(RateJObj, 'undefined') ->
 maybe_generate_weight(_RateJObj, Weight) -> kzd_rates:constrain_weight(Weight).
 
 -spec generate_weight(kz_term:ne_binary() | pos_integer(), kz_currency:units(), kz_currency:units()) ->
-                             kzd_rates:weight_range().
+          kzd_rates:weight_range().
 generate_weight(Prefix, UnitCost, UnitIntCost) when is_integer(Prefix) ->
     generate_weight(kz_term:to_binary(Prefix), UnitCost, UnitIntCost);
 generate_weight(?NE_BINARY = Prefix, UnitCost, UnitIntCost) ->

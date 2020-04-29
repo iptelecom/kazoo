@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2010-2019, 2600Hz
+%%% @copyright (C) 2010-2020, 2600Hz
 %%% @doc
 %%% @end
 %%%-----------------------------------------------------------------------------
@@ -129,6 +129,8 @@ handle_cast({'gen_listener',{'created_queue', Queue}}, State) ->
     {'noreply', State#{queue => Queue}, ?POLLING_INTERVAL};
 handle_cast({'gen_listener',{'is_consuming',_IsConsuming}}, State) ->
     {'noreply', State};
+handle_cast({'gen_listener',{'federators_consuming', _AreFederatorsConsuming}}, State) ->
+    {'noreply', State};
 handle_cast({'reset_search',QID}, #{cache := Cache} = State) ->
     lager:debug("resetting query id ~s", [QID]),
     ets:delete(Cache, QID),
@@ -257,7 +259,7 @@ search_carrier(Carrier, Options) ->
 wait_for_search(0) -> 'ok';
 wait_for_search(N) ->
     receive
-        {_Carrier, {ok, []}} ->
+        {_Carrier, {'ok', []}} ->
             lager:debug("~s found no numbers", [_Carrier]),
             wait_for_search(N - 1);
         {_Carrier, {'ok', Numbers}} ->
@@ -305,7 +307,7 @@ next(Options) ->
 %%------------------------------------------------------------------------------
 -ifndef(TEST).
 -spec create_discovery(kz_term:ne_binary(), module(), kz_json:object(), knm_number_options:options()) ->
-                              knm_number:knm_number().
+          knm_number:knm_number().
 create_discovery(DID=?NE_BINARY, Carrier, Data, Options0) ->
     Options = [{'state', ?NUMBER_STATE_DISCOVERY}
               ,{'module_name', kz_term:to_binary(Carrier)}

@@ -1,5 +1,5 @@
 %%%-----------------------------------------------------------------------------
-%%% @copyright (C) 2011-2019, 2600Hz
+%%% @copyright (C) 2011-2020, 2600Hz
 %%% @doc Util functions used by kazoo_couch
 %%% @author James Aimonetti
 %%% @end
@@ -86,15 +86,15 @@ db_delete(#server{}=Conn, DbName) ->
     end.
 
 -spec db_replicate(server(), kz_json:object() | kz_term:proplist()) ->
-                          {'ok', kz_json:object()} |
-                          couchbeam_error().
+          {'ok', kz_json:object()} |
+          couchbeam_error().
 db_replicate(#server{}=Conn, Prop) when is_list(Prop) ->
     couchbeam:replicate(Conn, kz_json:from_list(Prop));
 db_replicate(#server{}=Conn, JObj) ->
     couchbeam:replicate(Conn, JObj).
 
 -spec db_list(server(), view_options()) ->
-                     {'ok', kz_json:objects() | kz_term:ne_binaries()} | couchbeam_error().
+          {'ok', kz_json:objects() | kz_term:ne_binaries()} | couchbeam_error().
 db_list(#server{}=Conn, Options) ->
     couchbeam:all_dbs(Conn, Options).
 
@@ -103,14 +103,14 @@ db_view_cleanup(#server{}=Conn, DbName) ->
     do_db_view_cleanup(get_db(Conn, DbName)).
 
 -spec db_info(server()) ->
-                     {'ok', kz_term:ne_binaries()} |
-                     couchbeam_error().
+          {'ok', kz_term:ne_binaries()} |
+          couchbeam_error().
 db_info(#server{}=Conn) ->
     ?RETRY_504(couchbeam:all_dbs(Conn)).
 
 -spec db_info(server(), kz_term:ne_binary()) ->
-                     {'ok', kz_json:object()} |
-                     couchbeam_error().
+          {'ok', kz_json:object()} |
+          couchbeam_error().
 db_info(#server{}=Conn, DbName) ->
     ?RETRY_504(couchbeam:db_info(get_db(Conn, DbName))).
 
@@ -119,8 +119,8 @@ db_exists(#server{}=Conn, DbName) ->
     couchbeam:db_exists(Conn, kz_term:to_list(DbName)).
 
 -spec db_archive(server(), kz_term:ne_binary(), kz_term:ne_binary()) ->
-                        'ok' |
-                        couchbeam_error().
+          'ok' |
+          couchbeam_error().
 db_archive(#server{}=Conn, DbName, Filename) ->
     Db = get_db(Conn, DbName),
     {'ok', DbInfo} = db_info(Conn, DbName),
@@ -146,6 +146,7 @@ archive(#db{}=Db, DbName, File, MaxDocs, N, Pos) when N =< MaxDocs ->
     case kz_couch_view:all_docs(Db, ViewOptions) of
         {'ok', []} -> io:format("    no docs left after pos ~p~n", [Pos]);
         {'ok', Docs} ->
+            'ok' = maybe_add_comma(File, Pos),
             'ok' = archive_docs(File, Docs),
             io:format("    archived ~p docs~n", [N]);
         {'error', _E} ->
@@ -161,6 +162,7 @@ archive(Db, DbName, File, MaxDocs, N, Pos) ->
     case kz_couch_view:all_docs(Db, ViewOptions) of
         {'ok', []} -> io:format("    no docs left after pos ~p~n", [Pos]);
         {'ok', Docs} ->
+            'ok' = maybe_add_comma(File, Pos),
             'ok' = archive_docs(File, Docs),
             io:format("    archived ~p docs~n", [MaxDocs]),
             archive(Db, DbName, File, MaxDocs, N - MaxDocs, Pos + MaxDocs);
@@ -169,6 +171,18 @@ archive(Db, DbName, File, MaxDocs, N, Pos) ->
             timer:sleep(500),
             archive(Db, DbName, File, MaxDocs, N, Pos)
     end.
+
+%% when writing 2nd+ page of results, the previous page's last JObj will not have a comma after it
+%% so you would get files like
+%% [Pass1JObj,
+%%  Pass1JObj
+%%  Pass2JObj,
+%%  Pass2JObj
+%% Which is invalid JSON
+-spec maybe_add_comma(file:io_device(), non_neg_integer()) -> 'ok'.
+maybe_add_comma(_File, 0) -> 'ok';
+maybe_add_comma(File, _Pos) ->
+    'ok' = file:write(File, [$,]).
 
 -spec archive_docs(file:io_device(), kz_json:objects()) -> 'ok'.
 archive_docs(_, []) -> 'ok';
@@ -179,8 +193,8 @@ archive_docs(File, [Doc|Docs]) ->
     archive_docs(File, Docs).
 
 -spec db_import(server(), kz_term:ne_binary(), kz_term:ne_binary()) ->
-                       'ok' |
-                       couchbeam_error().
+          'ok' |
+          couchbeam_error().
 db_import(#server{}=Conn, DbName, Filename) ->
     case file:read_file(Filename) of
         {'ok', Text} -> do_db_import(Conn, DbName, kz_json:decode(Text));
@@ -188,12 +202,18 @@ db_import(#server{}=Conn, DbName, Filename) ->
     end.
 
 -spec do_db_import(server(), kz_term:ne_binary(), kz_json:objects()) ->
-                          'ok' |
-                          couchbeam_error().
+          'ok' |
+          couchbeam_error().
 do_db_import(#server{}=Conn, DbName, Docs) ->
-    JObjs0 = [kz_json:delete_keys([<<"_rev">>, <<"_attachments">>], kz_json:get_value(<<"doc">>, Doc)) || Doc <- Docs],
-    JObjs = [JObj || JObj <- JObjs0, filter_views(kz_json:get_value(<<"_id">>, JObj))],
+    JObjs = [cleanup_for_import(Doc)
+             || Doc <- Docs,
+                filter_views(kz_doc:id(Doc))
+            ],
     kz_couch_doc:save_docs(Conn, DbName, JObjs, []).
+
+cleanup_for_import(Doc) ->
+    JObj = kz_json:get_json_value(<<"doc">>, Doc),
+    kz_json:delete_keys([<<"_rev">>, <<"_attachments">>], JObj).
 
 filter_views(<<"_design", _/binary>>) -> 'false';
 filter_views(_Id) -> 'true'.
@@ -205,6 +225,9 @@ do_db_compact(#db{}=Db) ->
     case ?RETRY_504(couchbeam:compact(Db)) of
         'ok' ->
             lager:debug("compaction has started"),
+            'true';
+        {'ok', _OK} ->
+            lager:debug("compaction has started: ~p", [_OK]),
             'true';
         {'error', {'conn_failed', {'error', 'timeout'}}} ->
             lager:warning("connection timed out"),
