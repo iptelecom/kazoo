@@ -4,7 +4,6 @@ DEPS = amqp_client \
 	chatterbox \
 	couchbeam \
 	cowboy \
-	detergent \
 	ecsv \
 	eflame \
 	eiconv \
@@ -55,7 +54,6 @@ dep_apns = git https://github.com/2600hz/erlang-apns4erl.git aba1fa96a4abbbb2c16
 dep_certifi = hex 0.3.0
 dep_chatterbox = hex 0.7.0
 dep_cowboy = git https://github.com/ninenines/cowboy 2.2.0
-dep_detergent = git https://github.com/pap/detergent e86dfeded3e4f9f3f9278c6a1aea802079d38b54
 dep_eflame = git https://github.com/slfritchie/eflame 7b0bb1a7e8c8482a59421a3a50ae69d49af59d52
 dep_eiconv = git https://github.com/zotonic/eiconv
 dep_escalus = git https://github.com/esl/escalus 0de0463c345a1ade6fccfb9aadad719b58a1cef5
@@ -108,6 +106,7 @@ dep_syslog = git https://github.com/2600hz/erlang-syslog bbad537a1cb5e4f37e672d2
 
 dep_fcm = git https://github.com/softwarejoint/fcm-erlang.git b2f68a4c6f0f59475597a35e2dc9be13d9ba2910
 
-dep_gen_smtp = git https://github.com/2600hz/erlang-gen_smtp 973d3ea1867a6bb3565f67afb78b449253c3b76e
+dep_gen_smtp = git https://github.com/2600hz/erlang-gen_smtp 3f80bfcd4fd8704739d264eb4d5005d4392f2a35
 ## pinning gen_smtp because upstream made some breaking changes (using maps in some options)
 ## adding check to not convert if the From/To encodings match
+## latest commit to origin/2600Hz: Fixes for encoding email address in a single comma separated header line
